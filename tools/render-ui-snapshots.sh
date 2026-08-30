@@ -59,8 +59,8 @@ mkdir -p "$OUTPUT"
 "$BUILD/obj/ui-snapshot-renderer" "$OUTPUT" "$ROOT/assets/icon-master.png"
 
 count="$(find "$OUTPUT" -maxdepth 1 -type f -name '*.png' | wc -l | tr -d ' ')"
-[[ "$count" == "15" ]] || {
-  echo "error: expected 15 UI snapshots, found $count" >&2
+[[ "$count" == "16" ]] || {
+  echo "error: expected 16 UI snapshots, found $count" >&2
   exit 1
 }
 echo "Rendered: $OUTPUT"

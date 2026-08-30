@@ -12,11 +12,12 @@ days.
 Kechil PRO exists to prevent unintended disclosure through image metadata.
 The security properties that matter most:
 
-**No network access.** `App/KechilPRO.entitlements` enables the App Sandbox and
-requests only `com.apple.security.files.user-selected.read-write`. It omits
-`com.apple.security.network.client` and `com.apple.security.network.server`. A
-sandboxed macOS app without those entitlements cannot open a socket, so images
-cannot be transmitted even if the app were compromised or contained a bug.
+**No uploads or inbound server access.** `App/KechilPRO.entitlements` enables the
+App Sandbox, user-selected file access and `com.apple.security.network.client`.
+That outbound entitlement is used only when the user asks Kechil to fetch one direct
+image or video URL into its temporary folder. Kechil does not upload media, run a
+network server, send telemetry or make a background licensing/update request. The
+inbound `com.apple.security.network.server` entitlement remains absent.
 
 Audit any build yourself:
 
@@ -24,8 +25,9 @@ Audit any build yourself:
 codesign -d --entitlements - "Kechil PRO.app"
 ```
 
-A build that lists a network entitlement is not a legitimate build. Please
-report it.
+A legitimate signed build lists the sandbox, user-selected file and outbound client
+entitlements. A build that lists `com.apple.security.network.server` falls outside
+Kechil's stated security boundary and should be reported.
 
 **No file access beyond what you pick.** The app can only read and write files
 and folders selected through a system open/save panel.

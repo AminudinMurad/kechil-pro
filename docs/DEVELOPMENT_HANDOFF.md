@@ -156,6 +156,9 @@ Animated/keyframed marks and invisible/steganographic watermarks are outside sco
   HTTP(S) media plus local `file://` URLs or absolute paths.
 - Empty-route URL entry uses an in-field clipboard button and never auto-pastes on tab
   selection. Pasteboard reads are asynchronous and display a bounded progress state.
+- Upload file and Paste URL share one top-pinned selector. Their lightweight surfaces
+  remain mounted while the inactive surface is non-interactive and hidden from
+  accessibility, avoiding a control-tree rebuild and layout jump on every switch.
 - The 190 pt sidebar contains three tool groups, six routes, queue counts and a local/
   originals-safe card.
 - Settings panes use the order Source/Appearance/Placement/Output where applicable.
@@ -193,6 +196,12 @@ The current gate passes and includes:
   and lossless image-strip checks;
 - collision-safe save replacement and a hard guard preventing any queued original path
   from being selected as an output.
+
+The signed sandboxed development build was also exercised against local HTTP fixtures:
+one PNG and one MP4 were fetched through the real UI, entered their respective Clean
+queues and completed processing. Each sandboxed temporary import matched its served
+fixture byte-for-byte by SHA-256. The bundle carried the outbound network-client
+entitlement and no inbound network-server entitlement.
 
 ## Remaining release acceptance
 

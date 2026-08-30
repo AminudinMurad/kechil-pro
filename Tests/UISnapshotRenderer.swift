@@ -71,6 +71,15 @@ struct UISnapshotRenderer {
             tool: .clean,
             detail: "MOV, MP4 and M4V · originals are never overwritten",
             choose: {},
+            pasteURL: { _ in }),
+                   size: CGSize(width: 940, height: 520),
+                   to: outputDirectory.appendingPathComponent("video-upload-file.png"))
+
+        try render(MediaEmptyState(
+            media: .video,
+            tool: .clean,
+            detail: "MOV, MP4 and M4V · originals are never overwritten",
+            choose: {},
             pasteURL: { _ in },
             startsWithPasteURL: true),
                    size: CGSize(width: 940, height: 520),

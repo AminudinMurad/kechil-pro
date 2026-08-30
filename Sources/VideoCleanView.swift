@@ -357,14 +357,40 @@ struct MediaEmptyState: View {
             if pasteURL != nil {
                 inputModePicker
             }
-            if inputMode == .paste, let pasteURL {
-                pasteForm(submit: pasteURL)
+            if let pasteURL {
+                // Keep both lightweight input surfaces mounted. Replacing the whole
+                // subtree made AppKit rebuild the text field and drop-zone controls
+                // on every tab click, and the mode-dependent outer alignment also
+                // moved the selector between the top and centre of the card.
+                ZStack(alignment: .top) {
+                    uploadContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                               alignment: .center)
+                        .opacity(inputMode == .upload ? 1 : 0)
+                        .allowsHitTesting(inputMode == .upload)
+                        .disabled(inputMode != .upload)
+                        .accessibilityHidden(inputMode != .upload)
+
+                    pasteForm(submit: pasteURL)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                               alignment: .top)
+                        .opacity(inputMode == .paste ? 1 : 0)
+                        .allowsHitTesting(inputMode == .paste)
+                        .disabled(inputMode != .paste)
+                        .accessibilityHidden(inputMode != .paste)
+                }
+                .transaction { transaction in
+                    transaction.animation = nil
+                }
             } else {
                 uploadContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: .center)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity,
-               alignment: inputMode == .paste ? .top : .center)
+        // The shared mode selector is always pinned to this top edge. Only the
+        // content below it changes, so switching modes cannot shift the control.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(20)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor))
             .overlay(RoundedRectangle(cornerRadius: 12)
@@ -376,12 +402,10 @@ struct MediaEmptyState: View {
     private var inputModePicker: some View {
         HStack(spacing: 0) {
             modeButton("Upload file", selected: inputMode == .upload) {
-                cancelFetch()
-                inputMode = .upload
+                switchInputMode(to: .upload)
             }
             modeButton("Paste URL", selected: inputMode == .paste) {
-                inputMode = .paste
-                pasteError = nil
+                switchInputMode(to: .paste)
             }
         }
         .padding(3)
@@ -530,5 +554,19 @@ struct MediaEmptyState: View {
         fetchTask?.cancel()
         fetchTask = nil
         isFetching = false
+    }
+
+    private func switchInputMode(to mode: InputMode) {
+        guard inputMode != mode else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            if mode == .upload {
+                cancelFetch()
+            } else {
+                pasteError = nil
+            }
+            inputMode = mode
+        }
     }
 }

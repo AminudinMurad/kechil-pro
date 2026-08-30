@@ -40,13 +40,15 @@ Screen Recording permission:
 tools/render-ui-snapshots.sh
 ```
 
-This writes nine PNGs to `build/ui-snapshots/`, including the 940 × 650 minimum-height
-layout. Set `SKIP_APP_BUILD=1` only when the current host-architecture build objects are
-already known to be current.
+This writes 16 PNGs to `build/ui-snapshots/`, including the 940 × 650 minimum-height
+layout and separate Upload file / Paste URL placement checks. Set `SKIP_APP_BUILD=1`
+only when the current host-architecture build objects are already known to be current.
 
 ## Privacy check
 
-The sandbox allows only user-selected read/write files and no network entitlement:
+The sandbox allows user-selected read/write files plus outbound client access for a
+user-requested direct-media download. It must not contain the inbound network-server
+entitlement:
 
 ```bash
 codesign -d --entitlements - "build/Kechil PRO.app"

@@ -6,7 +6,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
-- The app is now a three-tool offline media utility: Clean, Optimize and Watermark.
+- The app is now a three-tool local-processing media utility: Clean, Optimize and Watermark.
   Each tool has separate Images and Videos routes and independent queues. Clean alone
   carries the direct-container, decoded-pixel-identity promise for supported images;
   optimize and watermark operations re-render pixels by design and remove metadata
@@ -37,14 +37,15 @@ This project follows [Semantic Versioning](https://semver.org/).
   choice re-runs the current queue from the original files, keeps unrelated metadata
   where the container supports it, and re-reads the output to report any selected-scope
   data that remains.
-- The workspace toolbar now includes an offline-safe **Paste URL…** action. It accepts
-  a Finder `file://` URL or absolute local path from the clipboard; remote HTTP(S)
-  downloads stay disabled because the app intentionally has no network entitlement.
+- The workspace toolbar and empty routes now include **Paste URL**. They accept a
+  direct HTTP(S) image/video URL, a Finder `file://` URL or an absolute local path.
+  Remote sources are downloaded into Kechil's sandboxed temporary folder before
+  entering the same local processing queue; media is never uploaded.
 - A header settings gear with the MacBook dashboard-size selector, a persistent
   security-scoped default media save folder, version/build/copyright information and a
   Klik PRO-style About card. The card identifies the GPL-3.0 license and includes an
   Updates placeholder; a separate support card links to GitHub, GitHub Sponsors,
-  Ko-fi and PayPal. No updater or network entitlement is added.
+  Ko-fi and PayPal. No updater, telemetry, inbound server access or upload path is added.
 - A fixed-width tool sidebar for Clean, Optimize and Watermark. Each group exposes
   Images and Videos with synchronized workspace mode switching and per-route queue counts.
 - Video Clean for MOV, MP4 and M4V: local metadata inspection, pass-through container
@@ -117,14 +118,15 @@ This project follows [Semantic Versioning](https://semver.org/).
   940 points while height remains resizable and is clamped to the visible screen.
   The window's position and height are remembered between launches; nothing about
   the images is.
-- App Sandbox entitlements granting only user-selected file access, with network
-  entitlements deliberately omitted so macOS prevents any network use.
+- App Sandbox entitlements granting user-selected file access and outbound client
+  access for an explicit direct-media fetch. The inbound network-server entitlement
+  remains absent.
 - `tools/build-app.sh` for building a signed `.app` without an Xcode project,
   including universal binary support.
 - `tools/make-dmg.sh`, which packages a signed universal build as a checksummed
-  disk image in `releases/`. It refuses to package a bundle whose entitlements are
-  missing the sandbox or contain anything network-related, so the app's central
-  privacy claim is asserted at build time instead of checked by hand.
+  disk image in `releases/`. It refuses to package a bundle missing the sandbox or
+  outbound direct-download entitlement, and rejects an inbound network-server
+  entitlement, so the app's privacy boundary is asserted at build time.
 - `tools/check.sh` combining a warnings-as-errors type-check with the algorithm
   correctness proof.
 - `Tests/verify_algorithm.py`, which builds images carrying real metadata and
@@ -137,6 +139,11 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Switching between Upload file and Paste URL no longer rebuilds the two empty-state
+  control trees or moves their shared selector between the centre and top of the card.
+  Both surfaces remain mounted, the inactive one is non-interactive and hidden from
+  accessibility, and the selector stays pinned to one position without transition
+  animation.
 - Finder Open With events now add supported files to the matching Images or Videos mode
   instead of opening an empty dashboard.
 - Saving now enforces the UI promise that queued originals are never overwritten, while
