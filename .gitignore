@@ -1,0 +1,16 @@
+.DS_Store
+build/
+releases/
+DerivedData/
+*.xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.log
+*.tmp
+
+# Per-seat git worktrees for concurrent development work (never committed)
+worktrees/
+
+# Test scratch output
+Tests/output/
+__pycache__/

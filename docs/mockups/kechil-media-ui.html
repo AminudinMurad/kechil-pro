@@ -1,0 +1,1520 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kechil PRO — Media Tools UI Mock</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #eef1f4;
+      --window: #f7f8fa;
+      --panel: #ffffff;
+      --panel-soft: #f4f6f8;
+      --line: #dfe3e8;
+      --line-strong: #cbd1d8;
+      --ink: #202327;
+      --muted: #6f757c;
+      --muted-2: #9399a0;
+      --blue: #0a72ff;
+      --blue-soft: #e9f2ff;
+      --green: #18b916;
+      --green-soft: #eaf8e9;
+      --sidebar: #f1f3f6;
+      --shadow: 0 22px 70px rgba(35, 42, 52, .18), 0 2px 10px rgba(35, 42, 52, .08);
+      --radius-lg: 18px;
+      --radius-md: 13px;
+      --radius-sm: 9px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 1180px;
+      min-height: 880px;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 12% 10%, rgba(10,114,255,.10), transparent 28%),
+        radial-gradient(circle at 90% 92%, rgba(24,185,22,.10), transparent 30%),
+        var(--canvas);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+
+    .stage {
+      width: 1140px;
+      padding: 36px 0;
+    }
+
+    .prototype-label {
+      margin: 0 auto 12px;
+      width: 940px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #616872;
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: .02em;
+    }
+
+    .prototype-label span:last-child {
+      color: #899099;
+      font-weight: 550;
+    }
+
+    .app-window {
+      width: 940px;
+      height: 770px;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid rgba(96, 103, 112, .22);
+      border-radius: 20px;
+      background: var(--window);
+      box-shadow: var(--shadow);
+    }
+
+    .titlebar {
+      height: 72px;
+      display: grid;
+      grid-template-columns: 138px 1fr auto;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(18px);
+      padding: 0 18px;
+    }
+
+    .traffic {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+    }
+
+    .traffic i {
+      width: 13px;
+      height: 13px;
+      display: block;
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.10);
+    }
+
+    .traffic i:nth-child(1) { background: #ff5f57; }
+    .traffic i:nth-child(2) { background: #febc2e; }
+    .traffic i:nth-child(3) { background: #28c840; }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      user-select: none;
+    }
+
+    .brand img {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
+    }
+
+    .wordmark {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      line-height: 1;
+    }
+
+    .wordmark strong {
+      font-size: 27px;
+      letter-spacing: -.04em;
+      font-weight: 780;
+    }
+
+    .pro-badge {
+      display: inline-flex;
+      align-items: center;
+      height: 18px;
+      margin-top: 1px;
+      padding: 0 5px;
+      border-radius: 5px;
+      background: var(--green);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .01em;
+    }
+
+    .version {
+      margin-left: 3px;
+      color: var(--muted-2);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .title-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .local-pill {
+      height: 27px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      border: 1px solid #cfe8ce;
+      border-radius: 999px;
+      background: var(--green-soft);
+      color: #268326;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .local-pill::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .icon-button {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .icon-button:hover { background: var(--panel-soft); }
+
+    .shell {
+      height: calc(100% - 72px);
+      display: grid;
+      grid-template-columns: 190px 1fr;
+    }
+
+    .sidebar {
+      min-width: 0;
+      padding: 18px 12px;
+      border-right: 1px solid var(--line);
+      background: var(--sidebar);
+    }
+
+    .sidebar-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px 12px;
+    }
+
+    .sidebar-head strong {
+      color: #757b83;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .sidebar-head span {
+      color: #9aa0a8;
+      font-size: 10px;
+    }
+
+    .tool-group {
+      margin-bottom: 9px;
+      padding-bottom: 9px;
+      border-bottom: 1px solid rgba(201,206,213,.7);
+    }
+
+    .tool-group:last-of-type { border-bottom: 0; }
+
+    .tool-title {
+      height: 38px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 9px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      font-size: 13px;
+      font-weight: 720;
+      text-align: left;
+    }
+
+    .tool-icon {
+      width: 25px;
+      height: 25px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #d5dbe2;
+      border-radius: 7px;
+      background: #fff;
+      color: #4c545e;
+    }
+
+    .tool-icon svg { width: 15px; height: 15px; }
+
+    .subtask {
+      width: 100%;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 2px 0;
+      padding: 0 9px 0 43px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #626971;
+      font-size: 12px;
+      font-weight: 630;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .subtask::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      flex: 0 0 auto;
+      border: 1.5px solid #9da4ac;
+      border-radius: 2px;
+    }
+
+    .subtask:hover { background: rgba(255,255,255,.68); color: var(--ink); }
+
+    .subtask.active {
+      background: #fff;
+      color: var(--blue);
+      box-shadow: 0 1px 3px rgba(30,39,50,.09), inset 3px 0 0 var(--blue);
+    }
+
+    .subtask.active::before {
+      border-color: var(--blue);
+      background: var(--blue);
+      box-shadow: inset 0 0 0 1.5px #fff;
+    }
+
+    .sidebar-note {
+      margin: 18px 7px 0;
+      padding: 10px 10px 11px;
+      border: 1px solid #dce4dc;
+      border-radius: 10px;
+      background: rgba(255,255,255,.66);
+      color: #697069;
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
+    .sidebar-note strong {
+      display: block;
+      margin-bottom: 2px;
+      color: #307d30;
+      font-size: 10.5px;
+    }
+
+    main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--window);
+    }
+
+    .workspace-head {
+      height: 76px;
+      flex: 0 0 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.7);
+    }
+
+    .route-title h1 {
+      margin: 0 0 4px;
+      font-size: 22px;
+      line-height: 1.05;
+      letter-spacing: -.025em;
+    }
+
+    .route-title p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11.5px;
+    }
+
+    .head-controls {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .mode-switch {
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #eef0f3;
+    }
+
+    .mode-switch button {
+      height: 28px;
+      min-width: 67px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: #70767e;
+      font-size: 11.5px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .mode-switch button.active {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 1px 3px rgba(25,34,45,.13);
+    }
+
+    .primary-button {
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 3px 7px rgba(10,114,255,.23);
+      font-size: 11.5px;
+      font-weight: 740;
+      cursor: pointer;
+    }
+
+    .primary-button:hover { filter: brightness(.96); }
+
+    .workspace {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      padding: 14px 16px 12px;
+      overflow: hidden;
+    }
+
+    .work-grid {
+      height: auto;
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      gap: 13px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--panel);
+      box-shadow: 0 1px 2px rgba(25,31,39,.025);
+    }
+
+    .settings-panel {
+      height: 100%;
+      min-height: 0;
+      padding: 13px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd1d8 transparent;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 11px;
+    }
+
+    .panel-title strong {
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .panel-title small {
+      color: var(--muted-2);
+      font-size: 9.5px;
+    }
+
+    .form-section {
+      padding: 8px 0;
+      border-top: 1px solid #edf0f2;
+    }
+
+    .form-section:first-of-type { padding-top: 0; border-top: 0; }
+
+    .section-label {
+      display: block;
+      margin: 0 0 7px;
+      color: #6d747c;
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: .065em;
+      text-transform: uppercase;
+    }
+
+    .mini-segment {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+      padding: 2px;
+      border-radius: 8px;
+      background: #edf0f3;
+    }
+
+    .mini-segment button {
+      height: 28px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: #747b83;
+      font-size: 10.5px;
+      font-weight: 680;
+      cursor: pointer;
+    }
+
+    .mini-segment button.active {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(20,28,38,.12);
+    }
+
+    .text-field {
+      width: 100%;
+      height: 32px;
+      margin-top: 7px;
+      padding: 0 9px;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: #fff;
+      color: #30343a;
+      font-size: 11px;
+      outline: none;
+    }
+
+    .text-field:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-soft); }
+
+    .field-row {
+      min-height: 30px;
+      display: grid;
+      grid-template-columns: 74px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      font-size: 10.5px;
+    }
+
+    .field-row + .field-row { margin-top: 5px; }
+
+    .field-row label { color: #555d66; }
+
+    .range {
+      height: 4px;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--blue) 0 var(--fill, 55%), #dfe3e8 var(--fill, 55%) 100%);
+      position: relative;
+    }
+
+    .range::after {
+      content: "";
+      position: absolute;
+      left: var(--fill, 55%);
+      top: 50%;
+      width: 11px;
+      height: 11px;
+      border: 1px solid #d1d6dc;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.15);
+      transform: translate(-50%, -50%);
+    }
+
+    .field-value {
+      min-width: 31px;
+      color: #687079;
+      font-size: 10px;
+      text-align: right;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 18px;
+      border: 1px solid #bfc5cb;
+      border-radius: 5px;
+      background: #fff;
+      box-shadow: inset 0 0 0 2px #fff;
+    }
+
+    .position-row {
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .position-grid {
+      width: 72px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f6f7f9;
+    }
+
+    .position-grid button {
+      aspect-ratio: 1;
+      padding: 0;
+      border: 0;
+      border-radius: 3px;
+      background: #d9dee4;
+      cursor: pointer;
+    }
+
+    .position-grid button.active { background: var(--blue); }
+
+    .toggle-stack { display: grid; gap: 8px; }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #555d66;
+      font-size: 10.5px;
+    }
+
+    .toggle {
+      width: 29px;
+      height: 17px;
+      padding: 2px;
+      border-radius: 99px;
+      background: #c9ced4;
+    }
+
+    .toggle::after {
+      content: "";
+      display: block;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.18);
+    }
+
+    .toggle.on { background: var(--blue); }
+    .toggle.on::after { margin-left: 12px; }
+
+    .select-row {
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      color: #555d66;
+      font-size: 10.5px;
+    }
+
+    .select-box {
+      height: 27px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #f8f9fa;
+      color: #3f454c;
+      font-size: 10px;
+    }
+
+    .size-mode {
+      margin-bottom: 8px;
+    }
+
+    .target-size-box {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .target-size-box .text-field {
+      height: 30px;
+      margin: 0;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .unit-pill {
+      height: 30px;
+      min-width: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #f5f7f9;
+      color: #5f6770;
+      font-size: 10px;
+      font-weight: 750;
+    }
+
+    .tradeoff-note {
+      margin-top: 7px;
+      padding: 7px 8px;
+      border: 1px solid #d9e6f7;
+      border-radius: 7px;
+      background: #f2f7fe;
+      color: #5f6f82;
+      font-size: 9.2px;
+      line-height: 1.35;
+    }
+
+    .tradeoff-note strong { color: #2e5f98; }
+
+    .time-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .time-pair label {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 5px;
+      color: #666e77;
+      font-size: 9.5px;
+    }
+
+    .time-box {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 7px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #f8f9fa;
+      color: #3f464e;
+      font-size: 9.7px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .trim-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 6px;
+      color: #798089;
+      font-size: 9.3px;
+    }
+
+    .trim-summary b { color: #3f464e; font-variant-numeric: tabular-nums; }
+
+    .crop-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      margin-top: 7px;
+    }
+
+    .crop-actions button {
+      height: 28px;
+      padding: 0 9px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: #555e68;
+      font-size: 9.7px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .crop-actions .edit-crop-button {
+      border-color: #b8d3f7;
+      background: var(--blue-soft);
+      color: #1767c7;
+    }
+
+    .estimate-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 8px;
+      font-size: 9.8px;
+    }
+
+    .estimate-grid span { color: #737a82; }
+    .estimate-grid b { color: #343a41; text-align: right; }
+    .estimate-grid .success { color: #268326; }
+
+    .action-button {
+      width: 100%;
+      height: 35px;
+      border: 0;
+      border-radius: 9px;
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 3px 7px rgba(10,114,255,.20);
+      font-size: 11px;
+      font-weight: 740;
+      cursor: pointer;
+    }
+
+    .preview-column {
+      min-width: 0;
+      height: 100%;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) 116px;
+      gap: 12px;
+    }
+
+    .preview-panel {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .preview-toolbar {
+      height: 45px;
+      flex: 0 0 45px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .preview-toolbar strong { font-size: 12px; }
+
+    .preview-toolbar .right-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .compare {
+      display: flex;
+      gap: 3px;
+      padding: 2px;
+      border-radius: 7px;
+      background: #eef0f3;
+    }
+
+    .compare button {
+      height: 24px;
+      padding: 0 8px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: #7a8189;
+      font-size: 9.5px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .compare button.active {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(0,0,0,.10);
+    }
+
+    .fit-pill {
+      height: 25px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: #70767e;
+      font-size: 9.5px;
+    }
+
+    .preview-stage {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+      background:
+        linear-gradient(45deg, #f2f3f5 25%, transparent 25%),
+        linear-gradient(-45deg, #f2f3f5 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #f2f3f5 75%),
+        linear-gradient(-45deg, transparent 75%, #f2f3f5 75%), #e7eaee;
+      background-size: 18px 18px;
+      background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+    }
+
+    .media-frame {
+      width: min(100%, 438px);
+      aspect-ratio: 16 / 9;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(13,22,34,.30);
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 77% 25%, #ffe494 0 6%, transparent 7%),
+        linear-gradient(175deg, transparent 0 58%, #1b6046 59% 70%, #123b37 71% 100%),
+        linear-gradient(155deg, transparent 0 48%, #4d9c70 49% 64%, transparent 65%),
+        linear-gradient(164deg, transparent 0 59%, #2a7651 60% 75%, transparent 76%),
+        linear-gradient(145deg, #8fd1dd 0, #d2e8d4 55%, #e9d5a7 100%);
+      box-shadow: 0 8px 22px rgba(25,32,40,.26);
+    }
+
+    .media-frame::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(105deg, transparent 0 15%, rgba(255,255,255,.14) 15.5% 16%, transparent 16.5% 100%),
+        linear-gradient(to top, rgba(2,14,19,.24), transparent 28%);
+      pointer-events: none;
+    }
+
+    .watermark-text {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 7px;
+      border-radius: 5px;
+      background: rgba(12,19,23,.22);
+      color: rgba(255,255,255,.92);
+      font-size: 12px;
+      font-weight: 730;
+      letter-spacing: -.01em;
+      text-shadow: 0 1px 2px rgba(0,0,0,.6);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.25);
+      backdrop-filter: blur(3px);
+    }
+
+    .watermark-text::before {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #40dd42;
+      box-shadow: 0 0 0 2px rgba(255,255,255,.35);
+    }
+
+    .safe-area {
+      position: absolute;
+      inset: 10px;
+      border: 1px dashed rgba(255,255,255,.34);
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
+    .crop-overlay {
+      position: absolute;
+      inset: 22px 34px;
+      z-index: 3;
+      border: 1.5px solid #fff;
+      border-radius: 2px;
+      box-shadow: 0 0 0 999px rgba(6, 13, 18, .48), 0 0 0 1px rgba(10,114,255,.9);
+      pointer-events: none;
+    }
+
+    .crop-overlay em {
+      position: absolute;
+      left: 5px;
+      top: 5px;
+      padding: 3px 5px;
+      border-radius: 4px;
+      background: rgba(10,114,255,.92);
+      color: #fff;
+      font-size: 8.5px;
+      font-style: normal;
+      font-weight: 750;
+      letter-spacing: .02em;
+    }
+
+    .crop-overlay i {
+      width: 8px;
+      height: 8px;
+      position: absolute;
+      border: 1px solid #0a72ff;
+      border-radius: 2px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.25);
+    }
+
+    .crop-overlay i:nth-of-type(1) { left: -4px; top: -4px; }
+    .crop-overlay i:nth-of-type(2) { right: -4px; top: -4px; }
+    .crop-overlay i:nth-of-type(3) { left: -4px; bottom: -4px; }
+    .crop-overlay i:nth-of-type(4) { right: -4px; bottom: -4px; }
+
+    .player-bar {
+      height: 46px;
+      flex: 0 0 46px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      border-top: 1px solid var(--line);
+      background: #fbfbfc;
+    }
+
+    .play-button {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: #fff;
+      color: #32383f;
+      cursor: pointer;
+    }
+
+    .play-button span { margin-left: 2px; font-size: 11px; }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: 38px 1fr 38px;
+      align-items: center;
+      gap: 7px;
+      color: #747b83;
+      font-size: 9px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timeline-track {
+      height: 4px;
+      position: relative;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--blue) 0 33%, #dfe3e8 33% 100%);
+    }
+
+    .timeline-track::after {
+      content: "";
+      position: absolute;
+      left: 33%;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--blue);
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0,0,0,.22);
+    }
+
+    .timeline-track.trim-active {
+      background: linear-gradient(90deg, #cfd4da 0 6%, var(--blue) 6% 93%, #cfd4da 93% 100%);
+    }
+
+    .timeline-track.trim-active::before,
+    .timeline-track.trim-active::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 8px;
+      height: 15px;
+      border: 2px solid #fff;
+      border-radius: 3px;
+      background: var(--blue);
+      box-shadow: 0 1px 3px rgba(0,0,0,.24);
+      transform: translate(-50%, -50%);
+    }
+
+    .timeline-track.trim-active::before { left: 6%; }
+    .timeline-track.trim-active::after { left: 93%; }
+
+    .volume { color: #757c84; font-size: 13px; }
+
+    .queue-panel { overflow: hidden; }
+
+    .queue-head {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 11px;
+      border-bottom: 1px solid #edf0f2;
+    }
+
+    .queue-head strong { font-size: 11px; }
+
+    .queue-head span {
+      color: #397d39;
+      font-size: 9.5px;
+      font-weight: 650;
+    }
+
+    .queue-item {
+      height: 80px;
+      display: grid;
+      grid-template-columns: 88px minmax(0,1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 11px;
+    }
+
+    .thumb {
+      height: 54px;
+      position: relative;
+      overflow: hidden;
+      border-radius: 7px;
+      background:
+        linear-gradient(165deg, transparent 0 55%, #255d45 56% 100%),
+        linear-gradient(150deg, #91d0da, #e7d7a6);
+    }
+
+    .thumb::after {
+      content: "▶";
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: rgba(255,255,255,.92);
+      font-size: 13px;
+      text-shadow: 0 1px 3px rgba(0,0,0,.5);
+    }
+
+    .file-info { min-width: 0; }
+
+    .file-info strong {
+      display: block;
+      overflow: hidden;
+      color: #343940;
+      font-size: 11px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-info span {
+      display: block;
+      margin-top: 4px;
+      color: #848a92;
+      font-size: 9.5px;
+    }
+
+    .file-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ready-pill {
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 8px;
+      border-radius: 7px;
+      background: var(--green-soft);
+      color: #2b8a2b;
+      font-size: 9.5px;
+      font-weight: 700;
+    }
+
+    .ready-pill::before { content: "✓"; }
+
+    .remove-button {
+      width: 24px;
+      height: 24px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: #949aa1;
+      cursor: pointer;
+    }
+
+    .drop-hint {
+      display: none;
+      height: 100%;
+      place-items: center;
+      padding: 22px;
+      border: 1.5px dashed #b8c7d8;
+      border-radius: 11px;
+      color: #74808c;
+      text-align: center;
+    }
+
+    .drop-hint strong { display: block; margin-bottom: 6px; color: #45505b; font-size: 13px; }
+    .drop-hint span { font-size: 10.5px; }
+
+    .route-note {
+      position: absolute;
+      left: 50%;
+      bottom: 19px;
+      transform: translateX(-50%);
+      color: rgba(72,80,90,.72);
+      font-size: 11px;
+      font-weight: 620;
+      pointer-events: none;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="prototype-label">
+      <span>Kechil PRO · Media workspace concept</span>
+      <span>Fixed 940 pt width · vertically resizable</span>
+    </div>
+
+    <section class="app-window" aria-label="Kechil PRO interactive UI mock">
+      <header class="titlebar">
+        <div class="traffic" aria-label="Window controls"><i></i><i></i><i></i></div>
+
+        <div class="brand">
+          <img src="../../assets/icon.png" alt="Kechil app icon">
+          <div>
+            <div class="wordmark"><strong>Kechil</strong><span class="pro-badge">PRO</span></div>
+            <div class="version">v1.0.0 (1)</div>
+          </div>
+        </div>
+
+        <div class="title-actions">
+          <span class="local-pill">Runs locally</span>
+          <button class="icon-button" aria-label="Settings" title="Settings">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.9 1.9-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.55V20h-2.7v-.09a1.7 1.7 0 0 0-1.03-1.55 1.7 1.7 0 0 0-1.88.34l-.06.06-1.9-1.9.06-.06A1.7 1.7 0 0 0 7.76 15a1.7 1.7 0 0 0-1.55-1.03H6v-2.7h.09a1.7 1.7 0 0 0 1.55-1.03 1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.9-1.9.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.55V5h2.7v.09a1.7 1.7 0 0 0 1.03 1.55 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.9 1.9-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.55 1.03H21v2.7h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="sidebar-head"><strong>Tools</strong><span>⌘1–6</span></div>
+
+          <div class="tool-group" data-tool="clean">
+            <div class="tool-title">
+              <span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 7 3v5c0 4.8-2.9 8.1-7 10-4.1-1.9-7-5.2-7-10V6l7-3Z"/><path d="m9 12 2 2 4-5"/></svg></span>
+              <span>Clean</span>
+            </div>
+            <button class="subtask" data-tool="clean" data-media="image">Images</button>
+            <button class="subtask" data-tool="clean" data-media="video">Videos</button>
+          </div>
+
+          <div class="tool-group" data-tool="optimize">
+            <div class="tool-title">
+              <span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 15v5h5M20 9V4h-5M14 10l6-6M4 20l6-6"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></span>
+              <span>Optimize</span>
+            </div>
+            <button class="subtask" data-tool="optimize" data-media="image">Images</button>
+            <button class="subtask" data-tool="optimize" data-media="video">Videos</button>
+          </div>
+
+          <div class="tool-group" data-tool="watermark">
+            <div class="tool-title">
+              <span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.5c3.2 4 5.3 6.8 5.3 10a5.3 5.3 0 0 1-10.6 0c0-3.2 2.1-6 5.3-10Z"/><path d="M9.5 14.5a2.8 2.8 0 0 0 2.5 1.6"/></svg></span>
+              <span>Watermark</span>
+            </div>
+            <button class="subtask" data-tool="watermark" data-media="image">Images</button>
+            <button class="subtask active" data-tool="watermark" data-media="video">Videos</button>
+          </div>
+
+          <div class="sidebar-note">
+            <strong>Private by design</strong>
+            Files stay on this Mac. Originals are never overwritten.
+          </div>
+        </aside>
+
+        <main>
+          <div class="workspace-head">
+            <div class="route-title">
+              <h1 id="route-name">Watermark</h1>
+              <p id="route-description">Add a visible text or logo mark to video files.</p>
+            </div>
+
+            <div class="head-controls">
+              <div class="mode-switch" aria-label="Media mode">
+                <button data-mode="image">Images</button>
+                <button class="active" data-mode="video">Videos</button>
+              </div>
+              <button class="primary-button" id="add-button"><span>＋</span><span>Add Videos</span></button>
+            </div>
+          </div>
+
+          <div class="workspace">
+            <div class="work-grid">
+              <section class="panel settings-panel">
+                <div class="panel-title"><strong id="settings-title">Watermark settings</strong><small id="preset-label">Custom</small></div>
+
+                <div id="watermark-controls">
+                  <div class="form-section">
+                    <span class="section-label">Source</span>
+                    <div class="mini-segment"><button class="active">Text</button><button>Logo</button></div>
+                    <input class="text-field" value="© Kechil PRO" aria-label="Watermark text">
+                  </div>
+
+                  <div class="form-section">
+                    <span class="section-label">Appearance</span>
+                    <div class="field-row"><label>Colour</label><div></div><span class="swatch"></span></div>
+                    <div class="field-row"><label>Opacity</label><div class="range" style="--fill:45%"></div><span class="field-value">45%</span></div>
+                    <div class="field-row"><label>Scale</label><div class="range" style="--fill:38%"></div><span class="field-value">8%</span></div>
+                    <div class="field-row"><label>Rotation</label><div class="range" style="--fill:38%"></div><span class="field-value">0°</span></div>
+                  </div>
+
+                  <div class="form-section">
+                    <span class="section-label">Placement</span>
+                    <div class="position-row">
+                      <div class="position-grid" aria-label="Watermark position">
+                        <button></button><button></button><button></button>
+                        <button></button><button></button><button></button>
+                        <button></button><button></button><button class="active"></button>
+                      </div>
+                      <div class="toggle-stack">
+                        <div class="toggle-row"><span>Safe area</span><i class="toggle on"></i></div>
+                        <div class="toggle-row"><span>Tile across frame</span><i class="toggle"></i></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-section">
+                    <span class="section-label">Video output</span>
+                    <div class="select-row"><span>Format</span><span class="select-box">MP4 <b>⌄</b></span></div>
+                    <div class="select-row"><span>Video</span><span class="select-box">H.264 · Balanced <b>⌄</b></span></div>
+                    <div class="select-row"><span>Audio</span><span class="select-box">Keep original <b>⌄</b></span></div>
+                  </div>
+
+                  <button class="action-button">Apply watermark to 1 video</button>
+                </div>
+
+                <div id="generic-controls" class="hidden"></div>
+              </section>
+
+              <section class="preview-column">
+                <div class="panel preview-panel">
+                  <div class="preview-toolbar">
+                    <strong id="preview-title">Live preview</strong>
+                    <div class="right-tools">
+                      <div class="compare"><button>Original</button><button class="active" id="result-label">Watermarked</button></div>
+                      <span class="fit-pill" id="view-pill">Fit · 42%</span>
+                    </div>
+                  </div>
+
+                  <div class="preview-stage">
+                    <div class="media-frame" id="media-frame">
+                      <div class="crop-overlay hidden" id="crop-overlay"><em>16:9 crop</em><i></i><i></i><i></i><i></i></div>
+                      <div class="safe-area"></div>
+                      <div class="watermark-text" id="watermark-preview">© Kechil PRO</div>
+                    </div>
+                  </div>
+
+                  <div class="player-bar" id="player-bar">
+                    <button class="play-button" aria-label="Play"><span>▶</span></button>
+                    <div class="timeline"><span>00:14</span><div class="timeline-track"></div><span>00:42</span></div>
+                    <span class="volume">⌕</span>
+                  </div>
+                </div>
+
+                <div class="panel queue-panel">
+                  <div class="queue-head"><strong id="queue-title">Queue · 1 video</strong><span>Ready to export</span></div>
+                  <div class="queue-item">
+                    <div class="thumb"></div>
+                    <div class="file-info"><strong id="file-name">holiday-clip.mov</strong><span id="file-meta">00:42 · 1920 × 1080 · H.264 · 68.4 MB</span></div>
+                    <div class="file-status"><span class="ready-pill">Ready</span><button class="remove-button">×</button></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </main>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const copy = {
+      clean: {
+        label: "Clean",
+        image: "Remove metadata and privacy-sensitive fields from images.",
+        video: "Remove supported metadata from video files without changing the picture.",
+        result: "Cleaned"
+      },
+      optimize: {
+        label: "Optimize",
+        image: "Crop, resize, convert and reduce image file size.",
+        video: "Trim, resize and compress videos for faster sharing.",
+        result: "Optimized"
+      },
+      watermark: {
+        label: "Watermark",
+        image: "Add a visible text or logo mark to image files.",
+        video: "Add a visible text or logo mark to video files.",
+        result: "Watermarked"
+      }
+    };
+
+    const genericTemplates = {
+      "clean-image": `
+        <div class="form-section"><span class="section-label">Clean preset</span><div class="mini-segment"><button class="active">Recommended</button><button>Custom</button></div></div>
+        <div class="form-section"><span class="section-label">Remove</span>
+          <div class="toggle-stack">
+            <div class="toggle-row"><span>Location & GPS</span><i class="toggle on"></i></div>
+            <div class="toggle-row"><span>Camera details</span><i class="toggle on"></i></div>
+            <div class="toggle-row"><span>Author & copyright</span><i class="toggle on"></i></div>
+            <div class="toggle-row"><span>Editing history</span><i class="toggle on"></i></div>
+          </div>
+        </div>
+        <div class="form-section"><span class="section-label">Keep</span>
+          <div class="toggle-stack"><div class="toggle-row"><span>Colour profile</span><i class="toggle on"></i></div><div class="toggle-row"><span>Orientation</span><i class="toggle on"></i></div></div>
+        </div>
+        <div class="form-section"><span class="section-label">Save</span><div class="select-row"><span>Output</span><span class="select-box">Same format <b>⌄</b></span></div><div class="select-row"><span>Naming</span><span class="select-box">Add “-clean” <b>⌄</b></span></div></div>
+        <button class="action-button">Clean 1 image</button>`,
+      "clean-video": `
+        <div class="form-section"><span class="section-label">Clean preset</span><div class="mini-segment"><button class="active">Recommended</button><button>Custom</button></div></div>
+        <div class="form-section"><span class="section-label">Detected metadata</span>
+          <div class="toggle-stack">
+            <div class="toggle-row"><span>Location data</span><i class="toggle on"></i></div>
+            <div class="toggle-row"><span>Device & software</span><i class="toggle on"></i></div>
+            <div class="toggle-row"><span>Creation timestamps</span><i class="toggle on"></i></div>
+            <div class="toggle-row"><span>Author & comments</span><i class="toggle on"></i></div>
+          </div>
+        </div>
+        <div class="form-section"><span class="section-label">Preserve media</span><div class="toggle-stack"><div class="toggle-row"><span>Video stream</span><i class="toggle on"></i></div><div class="toggle-row"><span>Audio stream</span><i class="toggle on"></i></div></div></div>
+        <div class="form-section"><span class="section-label">Save</span><div class="select-row"><span>Naming</span><span class="select-box">Add “-clean” <b>⌄</b></span></div></div>
+        <button class="action-button">Clean 1 video</button>`,
+      "optimize-image": `
+        <div class="form-section"><span class="section-label">Resize</span><div class="select-row"><span>Preset</span><span class="select-box">Web · 1600 px <b>⌄</b></span></div><div class="select-row"><span>Fit</span><span class="select-box">Longest edge <b>⌄</b></span></div></div>
+        <div class="form-section"><span class="section-label">Crop</span><div class="mini-segment"><button class="active">Keep ratio</button><button>Custom</button></div><div class="toggle-row" style="margin-top:8px"><span>Allow upscaling</span><i class="toggle"></i></div></div>
+        <div class="form-section"><span class="section-label">Output</span><div class="select-row"><span>Format</span><span class="select-box">WebP <b>⌄</b></span></div><div class="field-row"><label>Quality</label><div class="range" style="--fill:78%"></div><span class="field-value">82%</span></div><div class="select-row"><span>Metadata</span><span class="select-box">Remove private <b>⌄</b></span></div></div>
+        <div class="form-section"><span class="section-label">Estimated result</span><div class="toggle-row"><span>4.8 MB → 620 KB</span><strong style="color:#268326">−87%</strong></div></div>
+        <button class="action-button">Optimize 1 image</button>`,
+      "optimize-video": `
+        <div class="form-section"><span class="section-label">Trim</span><div class="time-pair"><label><span>In</span><span class="time-box">00:02.5</span></label><label><span>Out</span><span class="time-box">00:39.5</span></label></div><div class="trim-summary"><span>Drag the blue timeline handles</span><b>00:37.0 selected</b></div></div>
+        <div class="form-section"><span class="section-label">Crop</span><div class="select-row"><span>Aspect</span><span class="select-box">Original · 16:9 <b>⌄</b></span></div><div class="crop-actions"><button class="edit-crop-button">Done cropping</button><button>Reset</button></div></div>
+        <div class="form-section"><span class="section-label">Frame</span><div class="select-row"><span>Resolution</span><span class="select-box">Smart · up to 1080p <b>⌄</b></span></div><div class="select-row"><span>FPS</span><span class="select-box">Keep original <b>⌄</b></span></div></div>
+        <div class="form-section"><span class="section-label">File size</span>
+          <div class="mini-segment size-mode"><button>Quality</button><button class="active">Target size</button></div>
+          <div class="target-size-box"><input class="text-field" value="25" aria-label="Target file size"><span class="unit-pill">MB</span></div>
+          <div class="select-row"><span>Priority</span><span class="select-box">Balanced <b>⌄</b></span></div>
+          <div class="tradeoff-note"><strong>Smart resolution:</strong> keep 1080p when quality is healthy; step down to 720p before compression artifacts become distracting.</div>
+        </div>
+        <div class="form-section"><span class="section-label">Encoding</span><div class="select-row"><span>Format</span><span class="select-box">MP4 · H.264 <b>⌄</b></span></div><div class="field-row"><label>Audio</label><div class="range" style="--fill:50%"></div><span class="field-value">128k</span></div></div>
+        <div class="form-section"><span class="section-label">Estimated result</span><div class="estimate-grid"><span>Output size</span><b class="success">≈ 24.5–25 MB</b><span>Resolution</span><b>1920 × 1080</b><span>Video bitrate</span><b>≈ 5.2 Mbps</b></div></div>
+        <button class="action-button">Optimize 1 video</button>`
+    };
+
+    let activeTool = "watermark";
+    let activeMedia = "video";
+
+    function updateRoute(tool, media) {
+      activeTool = tool;
+      activeMedia = media;
+
+      document.querySelectorAll(".subtask").forEach(button => {
+        button.classList.toggle("active", button.dataset.tool === tool && button.dataset.media === media);
+      });
+      document.querySelectorAll(".mode-switch button").forEach(button => {
+        button.classList.toggle("active", button.dataset.mode === media);
+      });
+
+      document.getElementById("route-name").textContent = copy[tool].label;
+      document.getElementById("route-description").textContent = copy[tool][media];
+      document.getElementById("add-button").lastElementChild.textContent = media === "video" ? "Add Videos" : "Add Images";
+      document.getElementById("settings-title").textContent = `${copy[tool].label} settings`;
+      document.getElementById("result-label").textContent = copy[tool].result;
+      document.getElementById("queue-title").textContent = `Queue · 1 ${media}`;
+      document.getElementById("file-name").textContent = media === "video" ? "holiday-clip.mov" : "garden-photo.heic";
+      document.getElementById("file-meta").textContent = media === "video" ? "00:42 · 1920 × 1080 · H.264 · 68.4 MB" : "4032 × 3024 · HEIC · 4.8 MB";
+      document.getElementById("player-bar").classList.toggle("hidden", media !== "video");
+
+      const isVideoOptimize = tool === "optimize" && media === "video";
+      document.getElementById("crop-overlay").classList.toggle("hidden", !isVideoOptimize);
+      document.querySelector(".timeline-track").classList.toggle("trim-active", isVideoOptimize);
+      document.getElementById("view-pill").textContent = isVideoOptimize ? "Crop · 16:9" : "Fit · 42%";
+      const timeLabels = document.querySelectorAll(".timeline > span");
+      timeLabels[0].textContent = isVideoOptimize ? "00:02" : "00:14";
+      timeLabels[1].textContent = isVideoOptimize ? "00:39" : "00:42";
+
+      const watermarkControls = document.getElementById("watermark-controls");
+      const genericControls = document.getElementById("generic-controls");
+      const watermarkPreview = document.getElementById("watermark-preview");
+      const safeArea = document.querySelector(".safe-area");
+
+      if (tool === "watermark") {
+        watermarkControls.classList.remove("hidden");
+        genericControls.classList.add("hidden");
+        watermarkPreview.classList.remove("hidden");
+        safeArea.classList.remove("hidden");
+        const outputLabel = watermarkControls.querySelector(".form-section:nth-child(4) .section-label");
+        outputLabel.textContent = media === "video" ? "Video output" : "Image output";
+        watermarkControls.querySelector(".action-button").textContent = `Apply watermark to 1 ${media}`;
+      } else {
+        watermarkControls.classList.add("hidden");
+        genericControls.classList.remove("hidden");
+        genericControls.innerHTML = genericTemplates[`${tool}-${media}`];
+        watermarkPreview.classList.add("hidden");
+        safeArea.classList.add("hidden");
+      }
+
+      document.getElementById("preview-title").textContent = media === "video" ? "Frame preview" : "Image preview";
+    }
+
+    document.querySelectorAll(".subtask").forEach(button => {
+      button.addEventListener("click", () => updateRoute(button.dataset.tool, button.dataset.media));
+    });
+
+    document.querySelectorAll(".mode-switch button").forEach(button => {
+      button.addEventListener("click", () => updateRoute(activeTool, button.dataset.mode));
+    });
+
+    document.getElementById("generic-controls").addEventListener("click", event => {
+      const cropButton = event.target.closest(".edit-crop-button");
+      if (!cropButton) return;
+      const cropOverlay = document.getElementById("crop-overlay");
+      cropOverlay.classList.toggle("hidden");
+      cropButton.textContent = cropOverlay.classList.contains("hidden") ? "Edit crop in preview" : "Done cropping";
+    });
+
+    document.querySelector(".play-button").addEventListener("click", event => {
+      event.currentTarget.querySelector("span").textContent = event.currentTarget.querySelector("span").textContent === "▶" ? "Ⅱ" : "▶";
+    });
+
+    document.querySelectorAll(".compare button").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".compare button").forEach(item => item.classList.remove("active"));
+        button.classList.add("active");
+        document.getElementById("watermark-preview").style.opacity = button.textContent === "Original" ? "0" : "1";
+      });
+    });
+
+    const initialRoute = new URLSearchParams(location.search);
+    if (copy[initialRoute.get("tool")] && ["image", "video"].includes(initialRoute.get("media"))) {
+      updateRoute(initialRoute.get("tool"), initialRoute.get("media"));
+    }
+    const requestedHeight = Number(initialRoute.get("height"));
+    if (requestedHeight >= 700 && requestedHeight <= 960) {
+      document.querySelector(".app-window").style.height = `${requestedHeight}px`;
+    }
+  </script>
+</body>
+</html>

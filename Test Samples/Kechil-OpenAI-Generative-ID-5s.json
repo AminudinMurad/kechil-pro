@@ -1,0 +1,10 @@
+{
+  "codec" : "H.264",
+  "credential_status" : "synthetic unsigned test declaration",
+  "duration_seconds" : 5,
+  "file" : "Kechil-OpenAI-Generative-ID-5s.mov",
+  "not_authentic_openai_provenance" : true,
+  "openai_generative_id" : "openai-test-genid-4f61d8b7-531e-4f19-9ea6-bf4191696e13",
+  "purpose" : "Kechil PRO video metadata detection and Clean removal testing",
+  "resolution" : "640x360"
+}
