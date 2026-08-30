@@ -1,4 +1,5 @@
 import AppKit
+import CoreMedia
 import Foundation
 import SwiftUI
 
@@ -36,6 +37,14 @@ struct UISnapshotRenderer {
         try render(ContentView(initialRoute: .optimizeImages),
                    size: DashboardMetrics.minimumContentSize,
                    to: outputDirectory.appendingPathComponent("optimize-image-compact.png"))
+
+        try render(TransformToolView(model: makeCustomCropModel()),
+                   size: CGSize(width: 940, height: 900),
+                   to: outputDirectory.appendingPathComponent("optimize-image-custom-crop.png"))
+
+        try render(VideoOptimizeView(model: makeVideoTrimModel()),
+                   size: CGSize(width: 940, height: 900),
+                   to: outputDirectory.appendingPathComponent("optimize-video-trim.png"))
 
         let settings = SettingsPanel(settings: .shared, sizer: .shared)
         try renderFitting(settings,
@@ -181,6 +190,65 @@ struct UISnapshotRenderer {
         model.items = [item]
         model.selectedItemID = item.id
         return model
+    }
+
+    private static func makeCustomCropModel() -> TransformModel {
+        let model = TransformModel()
+        let preview = sampleImage(size: CGSize(width: 720, height: 480))
+        var item = TransformItem(sourceURL: URL(fileURLWithPath: "/tmp/Kechil-landscape.jpg"),
+                                 originalSize: 4_800_000)
+        item.sourceWidth = 2400
+        item.sourceHeight = 1600
+        item.width = 1100
+        item.height = 700
+        item.sourceThumbnail = preview
+        item.thumbnail = preview
+        model.items = [item]
+        model.selectedItemID = item.id
+        model.cropAspect = .custom
+        model.cropWidth = 1100
+        model.cropHeight = 700
+        model.cropFocusX = 0.64
+        model.cropFocusY = 0.42
+        model.resizeMode = .width
+        model.resizeValue = 1100
+        return model
+    }
+
+    private static func makeVideoTrimModel() -> VideoOptimizeModel {
+        let model = VideoOptimizeModel()
+        var item = VideoQueueItem(sourceURL: URL(fileURLWithPath: "/tmp/Kechil-demo.mp4"))
+        item.descriptor = MediaAssetDescriptor(
+            sourceURL: item.sourceURL, kind: .video, fileSize: 18_000_000,
+            contentTypeIdentifier: "public.mpeg-4", displayWidth: 1920,
+            displayHeight: 1080, duration: CMTime(seconds: 65.24, preferredTimescale: 600),
+            frameRate: 30, videoCodec: "H.264", audioCodec: "AAC",
+            hasAudio: true, isHDR: false, preferredTransform: nil)
+        item.poster = sampleImage(size: CGSize(width: 720, height: 405))
+        item.stage = .ready
+        item.statusText = "Ready to optimize"
+        model.items = [item]
+        model.selectedItemID = item.id
+        model.settings.trimStartSeconds = 8.2
+        model.settings.trimEndSeconds = 52.6
+        model.previewSeconds = 24.4
+        return model
+    }
+
+    private static func sampleImage(size: CGSize) -> NSImage {
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSColor(calibratedRed: 0.06, green: 0.12, blue: 0.24, alpha: 1).setFill()
+        NSBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
+        NSColor(calibratedRed: 0.10, green: 0.55, blue: 0.95, alpha: 1).setFill()
+        NSBezierPath(roundedRect: CGRect(x: size.width * 0.10, y: size.height * 0.18,
+                                        width: size.width * 0.34, height: size.height * 0.58),
+                     xRadius: 24, yRadius: 24).fill()
+        NSColor(calibratedRed: 0.25, green: 0.78, blue: 0.42, alpha: 1).setFill()
+        NSBezierPath(ovalIn: CGRect(x: size.width * 0.56, y: size.height * 0.23,
+                                   width: size.height * 0.50, height: size.height * 0.50)).fill()
+        image.unlockFocus()
+        return image
     }
 
     private static func render<Content: View>(

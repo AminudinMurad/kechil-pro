@@ -129,6 +129,34 @@ struct VideoOptimizeSettings: Codable, Equatable, Sendable {
     }
 }
 
+/// Normalises edits made by the In/Out trim handles while preserving the existing
+/// settings contract: zero Start plus a nil End means export the complete source.
+enum VideoTrimRangePolicy {
+    static let minimumDuration = 0.05
+
+    static func effectiveEnd(_ end: Double?, duration: Double) -> Double {
+        min(max(0, end ?? duration), duration)
+    }
+
+    static func start(proposed: Double, duration: Double, end: Double?) -> Double {
+        guard duration.isFinite, duration > minimumDuration else { return 0 }
+        let upper = max(0, effectiveEnd(end, duration: duration) - minimumDuration)
+        let value = min(max(0, proposed.isFinite ? proposed : 0), upper)
+        return value <= minimumDuration / 2 ? 0 : value
+    }
+
+    static func end(proposed: Double, duration: Double, start: Double) -> Double? {
+        guard duration.isFinite, duration > minimumDuration else { return nil }
+        let lower = min(duration, max(0, start) + minimumDuration)
+        let value = min(max(lower, proposed.isFinite ? proposed : duration), duration)
+        return value >= duration - minimumDuration / 2 ? nil : value
+    }
+
+    static func isFullSource(start: Double, end: Double?) -> Bool {
+        start <= minimumDuration / 2 && end == nil
+    }
+}
+
 enum VideoOptimizeValidationError: LocalizedError {
     case invalidDuration
     case trimTooShort

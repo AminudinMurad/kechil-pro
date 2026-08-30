@@ -3,6 +3,7 @@ import SwiftUI
 struct TransformToolView: View {
     @ObservedObject var model: TransformModel
     @State private var showsOriginal = false
+    @State private var resizeUsesSourceDefault = true
 
     var body: some View {
         HSplitView {
@@ -17,6 +18,21 @@ struct TransformToolView: View {
         // including text fields and slider drags.
         .onChange(of: previewSettingsKey) { _ in
             model.refreshOptimizePreview()
+        }
+        .onChange(of: model.cropAspect) { aspect in
+            guard aspect == .custom else { return }
+            seedCustomCropFromSource()
+        }
+        .onChange(of: model.resizeMode) { mode in
+            guard mode != .none else { return }
+            resizeUsesSourceDefault = true
+            seedResizeValue(for: mode)
+        }
+        .onChange(of: cropGeometryKey) { _ in
+            if model.cropAspect == .custom { seedCustomCropFromSource() }
+            if resizeUsesSourceDefault, model.resizeMode != .none {
+                seedResizeValue(for: model.resizeMode)
+            }
         }
     }
 
@@ -40,6 +56,17 @@ struct TransformToolView: View {
                     .frame(maxWidth: .infinity)
 
                     if model.cropAspect != .original {
+                        if model.cropAspect == .custom {
+                            HStack(spacing: 8) {
+                                cropDimensionField("Width", value: $model.cropWidth)
+                                Text("×").font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                cropDimensionField("Height", value: $model.cropHeight)
+                            }
+                            Text(customCropHelp)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
                         sliderRow("Focus X", value: $model.cropFocusX, range: 0...1,
                                   format: { $0 == 0 ? "Left" : $0 == 1 ? "Right" : "Centre" })
                         sliderRow("Focus Y", value: $model.cropFocusY, range: 0...1,
@@ -58,7 +85,7 @@ struct TransformToolView: View {
                         HStack {
                             Text(resizeValueLabel).font(.system(size: 11.5))
                             Spacer()
-                            TextField("Value", value: $model.resizeValue,
+                            TextField("Value", value: resizeValueBinding,
                                       format: .number.precision(.fractionLength(0)))
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 68)
@@ -205,6 +232,8 @@ struct TransformToolView: View {
                    let sourceAspect = sourceAspect(for: item) {
                     MediaCropGuide(aspect: model.cropAspect.ratio,
                                    sourceAspect: sourceAspect,
+                                   cropPixelSize: customCropSize,
+                                   sourcePixelSize: sourcePixelSize(for: item),
                                    focusX: model.cropFocusX,
                                    focusY: model.cropFocusY)
                 }
@@ -247,12 +276,31 @@ struct TransformToolView: View {
         [
             model.cropAspect.rawValue,
             String(model.cropFocusX), String(model.cropFocusY),
+            String(model.cropWidth), String(model.cropHeight),
             model.resizeMode.rawValue, String(model.resizeValue),
             String(model.dontUpscale), model.outputFormat.rawValue,
             String(model.qualityFloor), String(model.qualityCeiling),
             String(model.targetKilobytes), String(model.webPLossless),
             String(model.webPMethod),
         ].joined(separator: "|")
+    }
+
+    private var cropGeometryKey: String {
+        let item = model.selectedItem
+        return [
+            item?.id.uuidString ?? "none",
+            String(item?.sourceWidth ?? item?.width ?? 0),
+            String(item?.sourceHeight ?? item?.height ?? 0),
+            model.cropAspect.rawValue,
+            String(model.cropWidth), String(model.cropHeight),
+        ].joined(separator: "|")
+    }
+
+    private var resizeValueBinding: Binding<Double> {
+        Binding(get: { model.resizeValue }, set: { value in
+            resizeUsesSourceDefault = false
+            model.resizeValue = value
+        })
     }
 
     private func optimizedImage(for item: TransformItem) -> NSImage? {
@@ -272,11 +320,78 @@ struct TransformToolView: View {
     }
 
     private func sourceAspect(for item: TransformItem) -> CGFloat? {
+        if let size = sourcePixelSize(for: item), size.height > 0 {
+            return size.width / size.height
+        }
         guard let image = item.sourceThumbnail, image.size.width > 0, image.size.height > 0 else {
             guard let width = item.width, let height = item.height, height > 0 else { return nil }
             return CGFloat(width) / CGFloat(height)
         }
         return image.size.width / image.size.height
+    }
+
+    private func sourcePixelSize(for item: TransformItem) -> CGSize? {
+        guard let width = item.sourceWidth ?? item.width,
+              let height = item.sourceHeight ?? item.height,
+              width > 0, height > 0 else { return nil }
+        return CGSize(width: width, height: height)
+    }
+
+    private var customCropSize: CGSize? {
+        guard model.cropAspect == .custom, model.cropWidth > 0, model.cropHeight > 0 else {
+            return nil
+        }
+        return CGSize(width: model.cropWidth, height: model.cropHeight)
+    }
+
+    private var retainedCropSize: CGSize? {
+        guard let item = model.selectedItem, let source = sourcePixelSize(for: item) else {
+            return nil
+        }
+        return ImageCropGeometry.cropSize(source: source,
+                                          aspect: model.cropAspect.ratio,
+                                          customSize: customCropSize)
+    }
+
+    private var customCropHelp: String {
+        if let source = model.selectedItem.flatMap(sourcePixelSize),
+           let retained = retainedCropSize {
+            return "Independent pixels · retained area \(Int(retained.width)) × \(Int(retained.height)) of \(Int(source.width)) × \(Int(source.height))"
+        }
+        return "Width and height are independent. Oversized values are clamped per source."
+    }
+
+    private func seedCustomCropFromSource() {
+        guard let retained = retainedCropSize else { return }
+        if model.cropWidth <= 0 { model.cropWidth = Double(retained.width) }
+        if model.cropHeight <= 0 { model.cropHeight = Double(retained.height) }
+    }
+
+    private func seedResizeValue(for mode: ResizeMode) {
+        guard let size = retainedCropSize else {
+            if mode == .percent { model.resizeValue = 100 }
+            return
+        }
+        switch mode {
+        case .none: break
+        case .longEdge: model.resizeValue = Double(max(size.width, size.height).rounded())
+        case .width: model.resizeValue = Double(size.width.rounded())
+        case .height: model.resizeValue = Double(size.height.rounded())
+        case .percent: model.resizeValue = 100
+        }
+    }
+
+    private func cropDimensionField(_ label: String, value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label).font(.system(size: 9.5)).foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                TextField(label, value: value,
+                          format: .number.precision(.fractionLength(0)))
+                    .multilineTextAlignment(.trailing)
+                    .frame(minWidth: 62)
+                Text("px").font(.system(size: 9.5)).foregroundStyle(.tertiary)
+            }
+        }
     }
 
     private var resizeValueLabel: String {
@@ -308,8 +423,14 @@ struct TransformToolView: View {
                 Text(format(value.wrappedValue)).font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.secondary)
             }
-            Slider(value: value, in: range, step: step)
+            Slider(value: quantized(value, step: step), in: range)
         }
+    }
+
+    private func quantized(_ value: Binding<Double>, step: Double) -> Binding<Double> {
+        Binding(get: { value.wrappedValue }, set: { proposed in
+            value.wrappedValue = (proposed / step).rounded() * step
+        })
     }
 }
 

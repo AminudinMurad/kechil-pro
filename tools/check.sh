@@ -40,6 +40,21 @@ xcrun swiftc \
   "$ROOT"/Sources/*.swift
 echo "    Swift OK"
 
+echo "==> Checking image crop preview geometry"
+xcrun swiftc \
+  -sdk "$SDK" \
+  -module-cache-path "$OUT/module-cache" \
+  -parse-as-library \
+  -O \
+  -warnings-as-errors \
+  -target "$HOST_ARCH-apple-macosx13.0" \
+  -framework SwiftUI \
+  -o "$OUT/image-crop-geometry-checks" \
+  "$ROOT/Sources/ImageCropGeometry.swift" \
+  "$ROOT/Sources/MediaCropGuide.swift" \
+  "$ROOT/Tests/MediaCropGuideChecks.swift"
+"$OUT/image-crop-geometry-checks"
+
 echo "==> Checking compact scrollbar geometry"
 xcrun swiftc \
   -sdk "$SDK" \

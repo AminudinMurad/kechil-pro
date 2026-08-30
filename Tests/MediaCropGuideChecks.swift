@@ -19,6 +19,21 @@ struct MediaCropGuideChecks {
                                           focusX: 0.5, focusY: 1)
         expect((bottom?.minY ?? 0) > (top?.minY ?? 0),
                "zero vertical focus places the guide at the bottom")
+
+        let custom = MediaCropGuide.cropRect(
+            aspect: nil, sourceAspect: 2,
+            cropPixelSize: CGSize(width: 800, height: 700),
+            sourcePixelSize: CGSize(width: 2000, height: 1000),
+            container: CGSize(width: 600, height: 400))
+        expect(abs((custom?.width ?? 0) - 240) < 0.01 &&
+               abs((custom?.height ?? 0) - 210) < 0.01,
+               "custom width and height scale independently into the source preview")
+
+        let bounded = ImageCropGeometry.cropSize(
+            source: CGSize(width: 1000, height: 600), aspect: nil,
+            customSize: CGSize(width: 1400, height: 375))
+        expect(bounded == CGSize(width: 1000, height: 375),
+               "custom dimensions clamp independently without proportional scaling")
         print("Media crop guide checks passed")
     }
 

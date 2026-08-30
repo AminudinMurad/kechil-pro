@@ -6,6 +6,7 @@ import ImageIO
 
 enum CropAspect: String, CaseIterable, Identifiable {
     case original = "No crop"
+    case custom = "Custom size"
     case square = "1:1"
     case portrait = "4:5"
     case widescreen = "16:9"
@@ -15,7 +16,7 @@ enum CropAspect: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var ratio: CGFloat? {
         switch self {
-        case .original: return nil
+        case .original, .custom: return nil
         case .square: return 1
         case .portrait: return 4 / 5
         case .widescreen: return 16 / 9
@@ -99,6 +100,8 @@ struct TransformSettingsSnapshot {
     var cropAspect: CropAspect = .original
     var cropFocusX: Double = 0.5
     var cropFocusY: Double = 0.5
+    var cropWidth = 0.0
+    var cropHeight = 0.0
     var resizeMode: ResizeMode = .none
     var resizeValue: Double = 1600
     var dontUpscale = true
@@ -113,6 +116,8 @@ struct TransformSettingsSnapshot {
 
 struct TransformOutput {
     let data: Data
+    let sourceWidth: Int
+    let sourceHeight: Int
     let width: Int
     let height: Int
     let quality: Int
@@ -147,7 +152,9 @@ enum TransformPipeline {
         guard var image = CIImage(data: sourceData, options: [.applyOrientationProperty: true]) else {
             throw TransformError.unreadable
         }
+        let sourceExtent = image.extent.integral
         image = crop(image, aspect: settings.cropAspect,
+                     customWidth: settings.cropWidth, customHeight: settings.cropHeight,
                      focusX: settings.cropFocusX, focusY: settings.cropFocusY)
         image = resize(image, mode: settings.resizeMode, value: settings.resizeValue,
                        dontUpscale: settings.dontUpscale)
@@ -184,6 +191,8 @@ enum TransformPipeline {
         }
 
         return TransformOutput(data: result.data,
+                               sourceWidth: Int(sourceExtent.width),
+                               sourceHeight: Int(sourceExtent.height),
                                width: finalImage.width, height: finalImage.height,
                                quality: result.finalQuality,
                                targetMet: result.targetMet,
@@ -192,19 +201,16 @@ enum TransformPipeline {
     }
 
     private static func crop(_ image: CIImage, aspect: CropAspect,
+                             customWidth: Double, customHeight: Double,
                              focusX: Double, focusY: Double) -> CIImage {
-        guard let ratio = aspect.ratio else { return normalizeOrigin(image) }
         let source = image.extent
-        let sourceRatio = source.width / source.height
-        let cropSize: CGSize
-        if sourceRatio > ratio {
-            cropSize = CGSize(width: source.height * ratio, height: source.height)
-        } else {
-            cropSize = CGSize(width: source.width, height: source.width / ratio)
-        }
-        let x = source.minX + (source.width - cropSize.width) * CGFloat(max(0, min(1, focusX)))
-        let y = source.minY + (source.height - cropSize.height) * CGFloat(max(0, min(1, focusY)))
-        return normalizeOrigin(image.cropped(to: CGRect(origin: CGPoint(x: x, y: y), size: cropSize)))
+        let customSize = aspect == .custom && customWidth > 0 && customHeight > 0
+            ? CGSize(width: customWidth, height: customHeight) : nil
+        guard aspect != .original else { return normalizeOrigin(image) }
+        let rect = ImageCropGeometry.cropRect(source: source, aspect: aspect.ratio,
+                                              customSize: customSize,
+                                              focusX: focusX, focusY: focusY)
+        return normalizeOrigin(image.cropped(to: rect))
     }
 
     private static func resize(_ image: CIImage, mode: ResizeMode, value: Double,

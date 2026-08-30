@@ -30,11 +30,15 @@ struct VideoOptimizeView: View {
                     .font(.system(size: 10.5)).foregroundStyle(.secondary)
 
                 section("TRIM") {
-                    numericField("Start", value: $model.settings.trimStartSeconds, suffix: "sec")
-                    optionalNumericField("End", value: $model.settings.trimEndSeconds, suffix: "sec")
                     if let duration = sourceDuration {
-                        Text("Source duration \(Self.duration(duration))")
-                            .font(.system(size: 9.5)).foregroundStyle(.tertiary)
+                        VideoTrimRangeControl(duration: duration,
+                                              startSeconds: $model.settings.trimStartSeconds,
+                                              endSeconds: $model.settings.trimEndSeconds,
+                                              playheadSeconds: $model.previewSeconds,
+                                              refreshPreview: model.refreshPreview)
+                    } else {
+                        Label("Reading the source duration…", systemImage: "clock")
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                 }
 
@@ -241,16 +245,6 @@ struct VideoOptimizeView: View {
             Text(label).font(.system(size: 11))
             Spacer()
             TextField("0", value: value, format: .number.precision(.fractionLength(0...2)))
-                .multilineTextAlignment(.trailing).frame(width: 64)
-            Text(suffix).font(.system(size: 10)).foregroundStyle(.secondary).frame(width: 24, alignment: .leading)
-        }
-    }
-
-    private func optionalNumericField(_ label: String, value: Binding<Double?>, suffix: String) -> some View {
-        HStack {
-            Text(label).font(.system(size: 11))
-            Spacer()
-            TextField("Source", value: value, format: .number.precision(.fractionLength(0...2)))
                 .multilineTextAlignment(.trailing).frame(width: 64)
             Text(suffix).font(.system(size: 10)).foregroundStyle(.secondary).frame(width: 24, alignment: .leading)
         }

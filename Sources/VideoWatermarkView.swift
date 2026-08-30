@@ -257,8 +257,14 @@ struct VideoWatermarkView: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack { Text(label); Spacer(); Text(valueText(value.wrappedValue)).foregroundStyle(.secondary) }
                 .font(.system(size: 10.5))
-            Slider(value: value, in: range, step: step)
+            Slider(value: quantized(value, step: step), in: range)
         }
+    }
+
+    private func quantized(_ value: Binding<Double>, step: Double) -> Binding<Double> {
+        Binding(get: { value.wrappedValue }, set: { proposed in
+            value.wrappedValue = (proposed / step).rounded() * step
+        })
     }
 
     private static func duration(_ seconds: Double) -> String {

@@ -39,7 +39,7 @@ enum VideoCleanScope: String, CaseIterable, Identifiable, Hashable, Sendable {
 
     var symbolName: String {
         switch self {
-        case .contentCredentials: return "checkmark.seal.fill"
+        case .contentCredentials: return "seal.fill"
         case .descriptiveMetadata: return "text.alignleft"
         case .xmp: return "doc.text.fill"
         case .location: return "location.fill"

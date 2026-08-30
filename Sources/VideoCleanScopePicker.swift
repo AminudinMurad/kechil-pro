@@ -53,10 +53,15 @@ struct VideoCleanScopePicker: View {
             selection = next
         } label: {
             HStack(alignment: .top, spacing: 7) {
-                Image(systemName: selected ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                    .frame(width: 17, height: 17)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(selected ? Color.accentColor.opacity(0.14)
+                                       : Color.primary.opacity(0.055))
+                    Image(systemName: scope.symbolName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                }
+                .frame(width: 28, height: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(scope.title)
                         .font(.system(size: 10, weight: selected ? .semibold : .medium))

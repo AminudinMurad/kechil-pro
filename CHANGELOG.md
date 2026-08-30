@@ -32,6 +32,11 @@ This project follows [Semantic Versioning](https://semver.org/).
   because `iconutil` rewrites PNG metadata while preserving pixels.
 
 ### Added
+- Image Optimize now offers a **Custom size** crop with independent pixel width and
+  height, a shaded live retained-area guide, and safe per-source clamping for batches.
+- Video Optimize replaces numeric Start/End trim fields with draggable **In** and
+  **Out** markers, playhead-based marker buttons and a full-source default when no
+  markers are set.
 - Image Clean now places the four scoped choices beneath one **Remove** heading, using
   the non-redundant card labels **All metadata**, **AI metadata**, **EXIF** and **GPS**.
   Switching a choice re-runs the current queue from the original files, keeps unrelated
@@ -138,6 +143,13 @@ This project follows [Semantic Versioning](https://semver.org/).
   monotonic ladder without falling below the window minimum.
 
 ### Fixed
+- The Tools sidebar is permanently expanded, uses a stronger section label and clearer
+  child indentation, and Video Clean uses distinct metadata-group icons instead of a
+  repeated checkbox glyph.
+- Continuous sliders no longer display dense native step ticks as a thin dotted line.
+  Their displayed/exported increments remain quantized without the unwanted marks.
+- Image resize modes now initialise from the selected retained image dimensions;
+  Percentage starts at 100% instead of every mode inheriting a 1600 px placeholder.
 
 - Switching between Upload file and Paste URL no longer rebuilds the two empty-state
   control trees or moves their shared selector between the centre and top of the card.

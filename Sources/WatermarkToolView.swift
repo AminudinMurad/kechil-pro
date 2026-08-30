@@ -272,8 +272,16 @@ struct WatermarkToolView: View {
                 Text(valueText(value.wrappedValue)).font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.secondary)
             }
-            Slider(value: value, in: range, step: step)
+            Slider(value: quantized(value, step: step), in: range)
         }
+    }
+
+    /// The stepped Slider initializer draws dense native tick marks on macOS. Keep
+    /// the same value increments without asking AppKit to render those marks.
+    private func quantized(_ value: Binding<Double>, step: Double) -> Binding<Double> {
+        Binding(get: { value.wrappedValue }, set: { proposed in
+            value.wrappedValue = (proposed / step).rounded() * step
+        })
     }
 
     private var textColorBinding: Binding<Color> {

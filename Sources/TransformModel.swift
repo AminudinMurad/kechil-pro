@@ -19,6 +19,8 @@ struct TransformItem: Identifiable {
     var errorText: String?
     var thumbnail: NSImage?
     var sourceThumbnail: NSImage?
+    var sourceWidth: Int?
+    var sourceHeight: Int?
     var savedTo: URL?
 
     var displayName: String { sourceURL.lastPathComponent }
@@ -56,8 +58,10 @@ final class TransformModel: ObservableObject {
     @Published var cropAspect: CropAspect = .original
     @Published var cropFocusX = 0.5
     @Published var cropFocusY = 0.5
+    @Published var cropWidth = 0.0
+    @Published var cropHeight = 0.0
     @Published var resizeMode: ResizeMode = .none
-    @Published var resizeValue = 1600.0
+    @Published var resizeValue = 100.0
     @Published var dontUpscale = true
     @Published var outputFormat: ImageOutputFormat = .webp
     @Published var qualityFloor = 60.0
@@ -458,6 +462,7 @@ final class TransformModel: ObservableObject {
     private var snapshot: TransformSettingsSnapshot {
         TransformSettingsSnapshot(cropAspect: cropAspect,
                                   cropFocusX: cropFocusX, cropFocusY: cropFocusY,
+                                  cropWidth: cropWidth, cropHeight: cropHeight,
                                   resizeMode: resizeMode, resizeValue: resizeValue,
                                   dontUpscale: dontUpscale,
                                   outputFormat: outputFormat,
@@ -492,6 +497,8 @@ final class TransformModel: ObservableObject {
                 result.outputData = output.data
                 result.outputSize = output.data.count
                 result.outputFormat = settings.outputFormat
+                result.sourceWidth = output.sourceWidth
+                result.sourceHeight = output.sourceHeight
                 result.width = output.width
                 result.height = output.height
                 result.quality = output.quality

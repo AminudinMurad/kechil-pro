@@ -51,6 +51,15 @@ struct VideoOptimizeChecks {
         check(trimmed.width % 2 == 0 && trimmed.height % 2 == 0,
               "encoder dimensions are always even")
 
+        check(VideoTrimRangePolicy.isFullSource(start: 0, end: nil),
+              "no trim markers means the complete source")
+        check(VideoTrimRangePolicy.end(proposed: 10, duration: 10, start: 0) == nil,
+              "an Out handle at the source boundary is stored as no marker")
+        check(abs(VideoTrimRangePolicy.start(proposed: 8, duration: 10, end: 7) - 6.95) < 0.001,
+              "the In handle cannot cross the Out handle")
+        check(abs((VideoTrimRangePolicy.end(proposed: 2, duration: 10, start: 4) ?? 0) - 4.05) < 0.001,
+              "the Out handle cannot cross the In handle")
+
         if failures == 0 { print("\nALL VIDEO OPTIMIZE CHECKS PASSED") }
         else { print("\n\(failures) VIDEO OPTIMIZE CHECK(S) FAILED"); exit(1) }
     }

@@ -25,6 +25,9 @@ struct VideoCleanScopeChecks {
             "Known location metadata stored in user-data boxes",
             "Non-empty creation and modification timestamps",
         ], "video Clean cards keep the reference descriptions")
+        check(VideoCleanScope.allCases.map(\.symbolName) == [
+            "seal.fill", "text.alignleft", "doc.text.fill", "location.fill", "calendar",
+        ], "video Clean groups use distinct metadata icons instead of checkbox icons")
         check(VideoCleanSelection.all.scopes == VideoCleanScope.allCases,
               "all five groups are selected by default")
 

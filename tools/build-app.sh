@@ -18,8 +18,11 @@ MIN_MACOS="13.0"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/Sources"
 BUILD="$ROOT/build"
-APP="$BUILD/$APP_NAME.app"
+OUTPUT_APP="$BUILD/$APP_NAME.app"
+STAGING_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/kechil-app-build.XXXXXX")"
+APP="$STAGING_ROOT/$APP_NAME.app"
 ENTITLEMENTS="$ROOT/App/KechilPRO.entitlements"
+trap 'rm -rf "$STAGING_ROOT"' EXIT
 
 command -v xcrun >/dev/null 2>&1 || {
   echo "error: xcrun not found. Install Xcode or run: xcode-select --install" >&2
@@ -32,7 +35,7 @@ command -v xcrun >/dev/null 2>&1 || {
 SDK="${KECHIL_SDK_PATH:-$(xcrun --sdk macosx --show-sdk-path)}"
 
 echo "==> Cleaning"
-rm -rf "$APP" "$BUILD/obj"
+rm -rf "$OUTPUT_APP" "$BUILD/obj"
 mkdir -p "$BUILD/obj" "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 # -parse-as-library is required: without it swiftc looks for top-level statements
@@ -136,12 +139,29 @@ echo "==> Verifying"
 xattr -cr "$APP"
 xattr -d com.apple.FinderInfo "$APP" 2>/dev/null || true
 xattr -d 'com.apple.fileprovider.fpfs#P' "$APP" 2>/dev/null || true
-codesign --verify --deep --strict "$APP" && echo "    signature OK"
-du -sh "$APP" | awk '{print "    bundle size: " $1}'
+codesign --verify --deep --strict "$APP"
+
+echo "==> Copying verified bundle"
+ditto "$APP" "$OUTPUT_APP"
+OUTPUT_SIGNATURE_OK=0
+for attempt in {1..20}; do
+  xattr -d com.apple.FinderInfo "$OUTPUT_APP" 2>/dev/null || true
+  xattr -d 'com.apple.fileprovider.fpfs#P' "$OUTPUT_APP" 2>/dev/null || true
+  if codesign --verify --deep --strict "$OUTPUT_APP" 2>/dev/null; then
+    OUTPUT_SIGNATURE_OK=1
+    break
+  fi
+done
+[[ "$OUTPUT_SIGNATURE_OK" == "1" ]] || {
+  echo "error: copied app signature could not be verified after clearing File Provider metadata" >&2
+  exit 1
+}
+echo "    signature OK"
+du -sh "$OUTPUT_APP" | awk '{print "    bundle size: " $1}'
 
 echo ""
-echo "Built: $APP"
-echo "Run:   open \"$APP\""
+echo "Built: $OUTPUT_APP"
+echo "Run:   open \"$OUTPUT_APP\""
 
-[[ "${RUN:-0}" == "1" ]] && open "$APP"
+[[ "${RUN:-0}" == "1" ]] && open "$OUTPUT_APP"
 exit 0

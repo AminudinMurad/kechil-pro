@@ -165,8 +165,19 @@ Animated/keyframed marks and invisible/steganographic watermarks are outside sco
   accessibility, avoiding a control-tree rebuild and layout jump on every switch.
 - Image Clean mirrors Video Clean's section hierarchy with a shared Remove heading;
   its single-choice cards use the noun labels All metadata, AI metadata, EXIF and GPS.
+- Image Optimize custom crop width and height are independent pixels. Preview and
+  export share `ImageCropGeometry`; oversized values clamp independently per source.
+- Resize mode defaults derive from the selected retained crop size (or 100% for
+  Percentage). Do not restore the previous global 1600 px placeholder.
+- Video Optimize trim uses the `VideoTrimRangePolicy` In/Out marker contract. Start 0
+  plus End nil means the full source; handles retain a minimum 0.05 second range.
+- Slider increments are quantized through bindings rather than SwiftUI's stepped
+  initializer, because stepped macOS sliders render dense unwanted tick marks.
 - The 190 pt sidebar contains three tool groups, six routes, queue counts and a local/
-  originals-safe card.
+  originals-safe card. Groups are permanently expanded; image/video routes are
+  explicitly indented children and do not use disclosure controls.
+- Video Clean scope cards use each group's `symbolName` as their primary icon. The
+  selected background and border communicate state without repeated checkbox glyphs.
 - Settings panes use the order Source/Appearance/Placement/Output where applicable.
 - Settings includes a persistent security-scoped Default save folder. Fetched sources
   remain temporary; processed outputs use the configured folder or a Save dialog.

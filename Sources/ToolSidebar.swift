@@ -3,29 +3,29 @@ import SwiftUI
 struct ToolSidebar: View {
     @Binding var selection: ToolRoute
     let count: (ToolRoute) -> Int
-    @State private var expanded = Set(KechilTool.allCases)
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 13) {
                 Text("TOOLS")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.secondary)
+                    .tracking(0.35)
                     .padding(.horizontal, 8)
 
                 ForEach(KechilTool.allCases) { tool in
-                    DisclosureGroup(isExpanded: binding(for: tool)) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label(tool.title, systemImage: tool.symbol)
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 8)
+
                         VStack(spacing: 3) {
                             routeButton(ToolRoute(tool: tool, media: .image))
                             routeButton(ToolRoute(tool: tool, media: .video))
                         }
-                        .padding(.top, 4)
-                    } label: {
-                        Label(tool.title, systemImage: tool.symbol)
-                            .font(.system(size: 11.5, weight: .semibold))
-                            .foregroundStyle(.primary)
+                        .padding(.leading, 14)
                     }
-                    .tint(.secondary)
                 }
 
                 Divider().padding(.vertical, 2)
@@ -48,12 +48,6 @@ struct ToolSidebar: View {
         .background(Color(nsColor: .controlBackgroundColor))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Kechil tools")
-    }
-
-    private func binding(for tool: KechilTool) -> Binding<Bool> {
-        Binding(get: { expanded.contains(tool) }, set: { isExpanded in
-            if isExpanded { expanded.insert(tool) } else { expanded.remove(tool) }
-        })
     }
 
     private func routeButton(_ route: ToolRoute) -> some View {
