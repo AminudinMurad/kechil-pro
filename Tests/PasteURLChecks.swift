@@ -33,6 +33,33 @@ struct PasteURLChecks {
         check(PasteURLService.source(from: "ftp://example.com/file.mp4") == nil,
               "non-HTTP remote schemes are rejected")
 
+        let youtubeMessage = "YouTube links aren't supported. Download videos you own through YouTube Studio or Google Takeout, then add the local file."
+        let metaMessage = "Facebook and Instagram links aren't supported. Export media you own through Meta Accounts Center, then add the local file."
+        check(PasteURLService.validationMessage(
+                for: "https://www.youtube.com/watch?v=example", media: .video) == youtubeMessage,
+              "YouTube watch pages direct owners to official export tools")
+        check(PasteURLService.validationMessage(
+                for: "https://youtu.be/example", media: .video) == youtubeMessage,
+              "YouTube short links are rejected")
+        check(PasteURLService.validationMessage(
+                for: "https://rr1---sn.example.googlevideo.com/videoplayback", media: .video) == youtubeMessage,
+              "YouTube delivery hosts cannot bypass the safe-import boundary")
+        check(PasteURLService.validationMessage(
+                for: "https://www.facebook.com/reel/123", media: .video) == metaMessage,
+              "Facebook video pages direct owners to Accounts Center")
+        check(PasteURLService.validationMessage(
+                for: "https://www.instagram.com/reel/example/", media: .video) == metaMessage,
+              "Instagram Reel pages direct owners to Accounts Center")
+        check(PasteURLService.validationMessage(
+                for: "https://scontent.example.fbcdn.net/video.mp4", media: .video) == metaMessage,
+              "Meta delivery hosts cannot bypass the safe-import boundary")
+        check(PasteURLService.validationMessage(
+                for: "https://youtube.com.example.net/video.mp4", media: .video) == nil,
+              "domain-suffix matching does not reject lookalike hosts")
+        check(PasteURLService.validationMessage(
+                for: "https://media.example.com/video.mp4", media: .video) == nil,
+              "ordinary direct media hosts remain supported")
+
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("kechil-paste-url-checks-\(UUID().uuidString)",
                                     isDirectory: true)

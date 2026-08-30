@@ -16,11 +16,14 @@ struct CleanPresetChecks {
     static func main() {
         print("\nClean presets")
         let titles = CleanPreset.allCases.map(\.title)
-        check(titles == ["Remove all metadata", "AI metadata", "Remove EXIF", "Remove GPS"],
-              "four Clean choices use the approved labels")
+        check(titles == ["All metadata", "AI metadata", "EXIF", "GPS"],
+              "image Clean cards use noun labels under the shared Remove heading")
+        check(CleanPreset.allCases.allSatisfy { !$0.title.hasPrefix("Remove ") } &&
+              CleanPreset.allCases.allSatisfy { !$0.detail.hasPrefix("Remove ") },
+              "image Clean cards do not repeat the Remove heading")
         check(CleanPreset.allMetadata.removesAllMetadata &&
               !CleanPreset.aiMetadata.removesAllMetadata,
-              "only Remove all metadata is the broad-scope operation")
+              "only All metadata is the broad-scope operation")
 
         let gps = VideoMetadataFinding(scope: .file, category: .location,
                                        identifier: "com.apple.quicktime.location.ISO6709",
@@ -44,7 +47,7 @@ struct CleanPresetChecks {
               !CleanPreset.aiMetadata.matchesVideo(caption),
               "AI scope selects provenance findings without deleting captions")
         check(CleanPreset.allMetadata.matchesVideo(caption),
-              "Remove all metadata selects other removable findings")
+              "All metadata selects other removable findings")
 
         if failures == 0 {
             print("\nALL CLEAN PRESET CHECKS PASSED")

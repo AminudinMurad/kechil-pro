@@ -156,9 +156,15 @@ Animated/keyframed marks and invisible/steganographic watermarks are outside sco
   HTTP(S) media plus local `file://` URLs or absolute paths.
 - Empty-route URL entry uses an in-field clipboard button and never auto-pastes on tab
   selection. Pasteboard reads are asynchronous and display a bounded progress state.
+- YouTube, Facebook and Instagram page and delivery domains are rejected with guidance
+  to use YouTube Studio, Google Takeout or Meta Accounts Center for owned media. There
+  is no platform scraping, cookie ingestion, protected-stream reconstruction, `yt-dlp`
+  or FFmpeg integration.
 - Upload file and Paste URL share one top-pinned selector. Their lightweight surfaces
   remain mounted while the inactive surface is non-interactive and hidden from
   accessibility, avoiding a control-tree rebuild and layout jump on every switch.
+- Image Clean mirrors Video Clean's section hierarchy with a shared Remove heading;
+  its single-choice cards use the noun labels All metadata, AI metadata, EXIF and GPS.
 - The 190 pt sidebar contains three tool groups, six routes, queue counts and a local/
   originals-safe card.
 - Settings panes use the order Source/Appearance/Placement/Output where applicable.

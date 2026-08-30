@@ -27,19 +27,19 @@ enum CleanPreset: String, CaseIterable, Identifiable, Codable, Hashable, Sendabl
 
     var title: String {
         switch self {
-        case .allMetadata: return "Remove all metadata"
+        case .allMetadata: return "All metadata"
         case .aiMetadata:  return "AI metadata"
-        case .exif:        return "Remove EXIF"
-        case .gps:         return "Remove GPS"
+        case .exif:        return "EXIF"
+        case .gps:         return "GPS"
         }
     }
 
     var detail: String {
         switch self {
         case .allMetadata: return "EXIF, GPS, XMP and more"
-        case .aiMetadata:  return "Remove AI-related markers"
+        case .aiMetadata:  return "Provenance and generator markers"
         case .exif:        return "Camera and capture data"
-        case .gps:         return "Clear embedded location"
+        case .gps:         return "Embedded location data"
         }
     }
 

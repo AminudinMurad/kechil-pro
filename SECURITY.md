@@ -19,6 +19,11 @@ image or video URL into its temporary folder. Kechil does not upload media, run 
 network server, send telemetry or make a background licensing/update request. The
 inbound `com.apple.security.network.server` entitlement remains absent.
 
+YouTube, Facebook and Instagram page and media-delivery domains are rejected. Kechil
+does not scrape those platforms, accept their account cookies or reconstruct their
+playback streams. Media owned by the user should be exported through the platform's
+official tools and imported as a local file.
+
 Audit any build yourself:
 
 ```bash

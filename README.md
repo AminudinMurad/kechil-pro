@@ -27,6 +27,11 @@ direct `http(s)` image/video URL, a local `file://` URL or an absolute path. The
 clipboard is read only when its icon is clicked. Remote sources are downloaded to a
 temporary local file before entering the same on-device processing queue.
 
+Kechil intentionally rejects YouTube, Facebook and Instagram page or delivery URLs.
+It does not scrape webpages, accept social-account cookies or reconstruct protected
+playback streams. Export media you own through YouTube Studio, Google Takeout or Meta
+Accounts Center, then add the resulting local file to Kechil.
+
 The About card links to the GPL-3.0 terms and provides GitHub, GitHub Sponsors,
 Ko-fi and PayPal links for supporting open-source development. The Updates button
 is currently an offline placeholder and performs no network request.

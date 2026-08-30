@@ -314,7 +314,7 @@ struct InspectorPanel: View {
                         .foregroundStyle(.secondary)
                     if item.preset != .gps,
                        output.findings.contains(where: { $0.kind == .location }) {
-                        Label("GPS remains. Choose Remove GPS or Remove all metadata to remove it.",
+                        Label("GPS remains. Choose GPS or All metadata to remove it.",
                               systemImage: "location.fill")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(VizPalette.critical)

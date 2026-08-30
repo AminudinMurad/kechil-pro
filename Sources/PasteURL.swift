@@ -8,6 +8,42 @@ enum PasteURLSource: Equatable {
     case remote(URL)
 }
 
+/// Social platforms expose webpages, authenticated players and short-lived delivery
+/// URLs rather than user-owned direct media files. Kechil deliberately does not scrape
+/// those pages, accept account cookies or reconstruct protected playback streams.
+enum UnsupportedSocialMediaPlatform: Equatable {
+    case youtube
+    case meta
+
+    static func platform(for url: URL) -> Self? {
+        guard let host = url.host?.lowercased(), !host.isEmpty else { return nil }
+        if belongs(host, toAnyOf: [
+            "youtube.com", "youtu.be", "youtube-nocookie.com", "googlevideo.com",
+        ]) {
+            return .youtube
+        }
+        if belongs(host, toAnyOf: [
+            "facebook.com", "fb.watch", "instagram.com", "fbcdn.net", "cdninstagram.com",
+        ]) {
+            return .meta
+        }
+        return nil
+    }
+
+    var guidance: String {
+        switch self {
+        case .youtube:
+            return "YouTube links aren't supported. Download videos you own through YouTube Studio or Google Takeout, then add the local file."
+        case .meta:
+            return "Facebook and Instagram links aren't supported. Export media you own through Meta Accounts Center, then add the local file."
+        }
+    }
+
+    private static func belongs(_ host: String, toAnyOf domains: [String]) -> Bool {
+        domains.contains { domain in host == domain || host.hasSuffix("." + domain) }
+    }
+}
+
 enum PasteURLService {
     /// Best-effort clipboard text for the Paste URL sheet. Finder copies a local
     /// file URL to the `fileURL` pasteboard type; browsers usually expose plain
@@ -61,7 +97,13 @@ enum PasteURLService {
         guard let source = source(from: value) else {
             return "Use a direct http(s) URL, a local file URL, or an absolute path."
         }
-        guard case .local(let url) = source else { return nil }
+        guard case .local(let url) = source else {
+            if case .remote(let remoteURL) = source,
+               let platform = UnsupportedSocialMediaPlatform.platform(for: remoteURL) {
+                return platform.guidance
+            }
+            return nil
+        }
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
             return "That local file could not be found."
@@ -89,6 +131,7 @@ enum DirectMediaDownloadError: LocalizedError {
     case httpStatus(Int)
     case tooLarge
     case webpage
+    case unsupportedPlatform(UnsupportedSocialMediaPlatform)
     case unsupported(MediaKind)
     case emptyDownload
 
@@ -102,6 +145,8 @@ enum DirectMediaDownloadError: LocalizedError {
             return "That file is larger than Kechil's 20 GB direct-download limit."
         case .webpage:
             return "That URL returned a webpage, not a direct media file."
+        case .unsupportedPlatform(let platform):
+            return platform.guidance
         case .unsupported(let media):
             return "That URL did not return a supported \(media.singularTitle) file."
         case .emptyDownload:
@@ -117,6 +162,9 @@ enum DirectMediaDownloadService {
     static let maximumBytes: Int64 = 20_000_000_000
 
     static func fetch(_ remoteURL: URL, media: MediaKind) async throws -> URL {
+        if let platform = UnsupportedSocialMediaPlatform.platform(for: remoteURL) {
+            throw DirectMediaDownloadError.unsupportedPlatform(platform)
+        }
         var request = URLRequest(url: remoteURL,
                                  cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
                                  timeoutInterval: 60)
@@ -129,6 +177,10 @@ enum DirectMediaDownloadService {
         }
         guard (200...299).contains(http.statusCode) else {
             throw DirectMediaDownloadError.httpStatus(http.statusCode)
+        }
+        if let finalURL = response.url,
+           let platform = UnsupportedSocialMediaPlatform.platform(for: finalURL) {
+            throw DirectMediaDownloadError.unsupportedPlatform(platform)
         }
         if response.expectedContentLength > maximumBytes {
             throw DirectMediaDownloadError.tooLarge

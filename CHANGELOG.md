@@ -32,11 +32,11 @@ This project follows [Semantic Versioning](https://semver.org/).
   because `iconutil` rewrites PNG metadata while preserving pixels.
 
 ### Added
-- Clean now exposes the four scoped choices **Remove all metadata**, **AI metadata**,
-  **Remove EXIF** and **Remove GPS** on both the Images and Videos routes. Switching a
-  choice re-runs the current queue from the original files, keeps unrelated metadata
-  where the container supports it, and re-reads the output to report any selected-scope
-  data that remains.
+- Image Clean now places the four scoped choices beneath one **Remove** heading, using
+  the non-redundant card labels **All metadata**, **AI metadata**, **EXIF** and **GPS**.
+  Switching a choice re-runs the current queue from the original files, keeps unrelated
+  metadata where the container supports it, and re-reads the output to report any
+  selected-scope data that remains. Video Clean retains its five multi-select groups.
 - The workspace toolbar and empty routes now include **Paste URL**. They accept a
   direct HTTP(S) image/video URL, a Finder `file://` URL or an absolute local path.
   Remote sources are downloaded into Kechil's sandboxed temporary folder before
@@ -144,6 +144,10 @@ This project follows [Semantic Versioning](https://semver.org/).
   Both surfaces remain mounted, the inactive one is non-interactive and hidden from
   accessibility, and the selector stays pinned to one position without transition
   animation.
+- Paste URL now rejects recognised YouTube, Facebook and Instagram page and delivery
+  domains with official-export guidance. Kechil does not scrape platform pages, accept
+  social-account cookies or reconstruct protected playback streams; ordinary direct
+  image/video hosts and local files remain supported.
 - Finder Open With events now add supported files to the matching Images or Videos mode
   instead of opening an empty dashboard.
 - Saving now enforces the UI promise that queued originals are never overwritten, while

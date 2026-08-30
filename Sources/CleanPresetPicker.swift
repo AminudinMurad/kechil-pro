@@ -9,10 +9,24 @@ struct CleanPresetPicker: View {
     var isDisabled = false
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4),
-                  spacing: 8) {
-            ForEach(CleanPreset.allCases) { preset in
-                option(preset)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Label("Remove", systemImage: "checkmark.shield.fill")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(selection == .allMetadata ? "All supported groups" : selection.title)
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4),
+                      spacing: 8) {
+                ForEach(CleanPreset.allCases) { preset in
+                    option(preset)
+                }
             }
         }
         .padding(.horizontal, 14)
@@ -20,7 +34,7 @@ struct CleanPresetPicker: View {
         .background(Color(nsColor: .controlBackgroundColor))
         .opacity(isDisabled ? 0.62 : 1)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Clean options for \(media.title.lowercased())")
+        .accessibilityLabel("Image metadata groups to remove")
     }
 
     private func option(_ preset: CleanPreset) -> some View {
