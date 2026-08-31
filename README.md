@@ -26,13 +26,24 @@ workflow, support continued development and media-format testing:**
 
 </div>
 
-## ✨ v1.0.0 highlights
+## Current source build
+
+The public `main` branch now contains the verified **Kechil PRO v1.0.1 (build 2)**
+source candidate. It follows the initial v1.0.0 release with measured output-size
+updates, predictable multi-file queues, and a more compact workspace for smaller
+MacBook screens. See the [v1.0.1 source commit](https://github.com/AminudinMurad/kechil-pro/commit/522a7c14984c095ada40b32eec6aac8d792e10a8).
+
+The latest downloadable GitHub release remains **v1.0.0 (build 1)** until v1.0.1
+is published as a tagged release. The installation links below intentionally point
+to the existing public package rather than to files that have not been published.
+
+## ✨ v1.0.1 (build 2) highlights
 
 - **Three focused tools** — Clean, Optimize and Watermark, each with separate
   Images and Videos modes and independent queues.
-- **Real output-size estimates** — Clean, Optimize and Watermark measure the
-  actual output path, including full image encoding and real short video sampling,
-  so settings changes produce useful estimates rather than guesses.
+- **Real output-size estimates** — Clean, Optimize and Watermark measure the exact
+  output path, including full image encoding and a real short video sample, so
+  settings changes produce useful estimates rather than guesses.
 - **Native batch selection** — click, Command-click and Shift-click follow familiar
   macOS queue selection behaviour across all six routes.
 - **Separate multi-file saves** — Save Selected writes one prepared output directly,
@@ -42,10 +53,52 @@ workflow, support continued development and media-format testing:**
   dimensions until that item's current preview or output has rendered.
 - **Consistent green actions** — Save, Save Selected and Save All share one clear
   green treatment and exact width throughout the workspace.
+- **Compact 13-inch layouts** — Image and Video Optimize use the same queue-first
+  structure, compact preview sizing, and aligned Save All / Save Selected controls.
+- **Safer video cleaning** — provenance and exporter metadata are re-probed after
+  cleaning, including no-match videos that must remain unchanged and saveable.
 
 ## Screenshots & product previews
 
-The repository includes three interface views of the fixed-width native workspace:
+These current native UI captures show the inspect-first Clean workflow, the compact
+Image and Video Optimize queues, live output-size measurements, and the separate
+Watermark routes. The gallery is followed by larger product previews of the fixed
+940-point workspace.
+
+### Clean — inspect provenance before changing a file
+
+<p align="center">
+  <img src="docs/screenshots/clean-image-review.png?v=1.0.1-b2" width="940" alt="Kechil PRO Clean Images review showing metadata scopes, findings, provenance evidence and a not-yet-created output">
+</p>
+
+### Optimize — compact image queue and crop guidance
+
+<p align="center">
+  <img src="docs/screenshots/optimize-image-compact.png?v=1.0.1-b2" width="940" alt="Kechil PRO compact Image Optimize workspace showing crop guidance, Batch output controls and multiple queued images">
+</p>
+
+### Optimize — compact video preview, trim and queue
+
+<p align="center">
+  <img src="docs/screenshots/optimize-video-compact.png?v=1.0.1-b2" width="940" alt="Kechil PRO compact Video Optimize workspace showing the queue header, video preview, trim handles and selected video row">
+</p>
+
+### Live output-size estimates
+
+<p align="center">
+  <img src="docs/screenshots/live-output-estimates.png?v=1.0.1-b2" width="560" alt="Kechil PRO live output estimates showing exact Clean, Watermark, Optimize and sampled video measurements">
+</p>
+
+### Watermark — image and video entry routes
+
+<p align="center">
+  <img src="docs/screenshots/watermark-image-empty.png?v=1.0.1-b2" width="460" alt="Kechil PRO Watermark Images workspace with text or logo controls and a local-only image drop area">
+  <img src="docs/screenshots/watermark-video-empty.png?v=1.0.1-b2" width="460" alt="Kechil PRO Watermark Videos workspace with a local-only video drop area and static watermark workflow">
+</p>
+
+### Product previews
+
+The larger product previews below show the fixed-width native workspace with a
 Watermark video preview, Optimize crop and trim, and Optimize target-size mode.
 They show the separate tool modes, queue, live preview, visible output controls and
 the local-processing privacy cue used throughout the app.
@@ -121,9 +174,11 @@ For the source preview layout, see the [interactive media workspace preview](doc
 
 ## Install (pre-built release)
 
-The current release is **Kechil PRO v1.0.0 (build 1)**, provided as one universal
-macOS app for Apple Silicon and Intel Macs. The DMG is the recommended download;
-the ZIP contains the same app as an alternative.
+The latest public release is **Kechil PRO v1.0.0 (build 1)**, provided as one
+universal macOS app for Apple Silicon and Intel Macs. The DMG is the recommended
+download; the ZIP contains the same app as an alternative. The newer v1.0.1/build 2
+source is already on `main`, but its package is not linked here until that version
+has been published as a GitHub Release.
 
 [**Download Kechil PRO v1.0.0**](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.0)
 
@@ -243,7 +298,9 @@ The resulting app is at build/Kechil PRO.app; release packages are in releases/.
 
 ## Tested with
 
-The public v1.0.0 source and package were verified with:
+The v1.0.1 (build 2) source currently on `main` passed the full verification gate.
+The public v1.0.0 package was separately checked as the downloadable release.
+Coverage includes:
 
 | Area | Coverage |
 | --- | --- |
