@@ -191,10 +191,16 @@ shasum -a 256 -c Kechil-PRO-v1.0.1-macos-universal.dmg.sha256
 shasum -a 256 -c Kechil-PRO-v1.0.1-macos-universal.zip.sha256
 ~~~
 
-The initial release is ad-hoc signed for local distribution. It is not signed with
-an Apple Developer ID and is not notarised, so macOS may require the normal manual
-approval flow for a downloaded app. The release notes describe this boundary and
-the verified package contents.
+> **First launch on macOS**
+>
+> Kechil PRO is currently ad-hoc signed for local distribution. It is not signed
+> with an Apple Developer ID and is not notarised by Apple. After downloading the
+> universal DMG, open it and drag **Kechil PRO** to **Applications**. The first
+> time you launch it, Control-click the app in Finder and choose **Open**. If
+> macOS still blocks it, open **System Settings → Privacy & Security → Open
+> Anyway**, then confirm **Open**. Only do this for a copy downloaded from the
+> official release links above. The [release notes](docs/RELEASE_NOTES_v1.0.1.md)
+> document the signing boundary and verified package contents.
 
 ## Batch workflow
 
