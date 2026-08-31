@@ -25,10 +25,10 @@ enum BatchActionChecks {
 
         for (ready, matches, busy, enabled, title) in [
             (3, 2, false, true, "Clean All"),
-            (3, 0, false, true, "Prepare Copies"),
+            (3, 0, false, true, "Re-Save All"),
             (0, 0, false, false, "Clean All"),
             (3, 2, true, false, "Clean All"),
-            (3, 0, true, false, "Prepare Copies"),
+            (3, 0, true, false, "Re-Save All"),
         ] {
             let state = CleanBatchActionState(readyCount: ready, plannedChangeCount: matches,
                                               isProcessing: busy)

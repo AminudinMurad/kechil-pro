@@ -249,7 +249,7 @@ struct InspectorPanel: View {
                 .foregroundStyle(Color.accentColor)
             Text(plan.hasRequestedChanges
                  ? "This inspected source matches the selected scope. No output exists yet; choose Clean Selected to create and verify a new copy."
-                 : "No matching metadata was found for this scope. Clean Selected will only prepare an explicitly labelled unchanged copy.")
+                 : "No matching metadata was found for this scope. Re-Save Selected will only create an explicitly labelled unchanged file.")
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

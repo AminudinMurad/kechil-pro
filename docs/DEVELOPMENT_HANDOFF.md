@@ -2,10 +2,25 @@
 
 Updated: 2026-08-31
 
-## 2026-08-31 local follow-up: Image Optimize live size and crop-row alignment
+## v1.0.1 public release status
 
-This working-tree follow-up is intentionally local and has not been committed or
-pushed. Image Optimize now uses the same full `TransformPipeline` render and encoder
+The follow-up work documented below was finalized, rebuilt and published as Kechil
+PRO v1.0.1 (build 2). The current public release is documented in
+[RELEASE_NOTES_v1.0.1.md](RELEASE_NOTES_v1.0.1.md), with the universal DMG, ZIP and
+matching checksum sidecars available from the
+[GitHub release page](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1).
+The final package and source gate passed with 117 real-media interaction assertions,
+39 native UI snapshots, universal `x86_64 arm64` binaries, strict/deep signatures,
+and valid package checksums.
+
+The release also includes the Klik PRO-style public GitHub release check: automatic
+checking is enabled by default, can be disabled in Settings, and never downloads an
+update automatically. The in-app GitHub button opens the Kechil PRO repository.
+
+## 2026-08-31 v1.0.1 feature follow-up: Image Optimize live size and crop-row alignment
+
+This follow-up was finalized in v1.0.1. Image Optimize now uses the same full
+`TransformPipeline` render and encoder
 as its live preview to populate an **Optimized output estimate** card. Crop, resize,
 format and quality changes cancel stale work, remeasure the selected source, and show
 the new encoded byte count without changing the prepared queue output. The queue row
@@ -19,8 +34,8 @@ crop `×` now aligns with the numeric input controls rather than the labels abov
 The authoritative real-media interaction suite passes 117 assertions, including the
 new Optimize measurement and remeasurement checks. The 39 native UI snapshots render
 successfully; the populated Optimize view, custom crop row, and empty Optimize and
-Watermark routes were visually inspected. No release package or public GitHub state
-was changed by this follow-up.
+Watermark routes were visually inspected. The current package status is recorded
+above and in the v1.0.1 release notes.
 
 ## 2026-08-31 live Clean and Watermark size estimates
 
@@ -54,7 +69,7 @@ to toggle, or Shift-click a range. The last clicked row remains the preview prim
 while Selected processing captures the selected IDs and current settings before work
 starts; changing the selection mid-run cannot expand the target. Button names are
 Clean, Optimize or Watermark Selected/All, with no Apply prefix. Clean's no-match
-actions remain Prepare Copies / Prepare Selected Copy. Save Selected writes one
+actions are Re-Save All / Re-Save Selected. Save Selected writes one
 prepared output directly or, for multiple selected prepared outputs, asks once for a
 folder and writes separate collision-safe files. Save, Save Selected and Save All
 share one green style and exact width; Clean has equal-width queue footers and

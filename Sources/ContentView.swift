@@ -11,6 +11,7 @@ struct ContentView: View {
     @StateObject private var videoWatermarkModel = VideoWatermarkModel()
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var sizer = DashboardSizer.shared
+    @ObservedObject private var updateChecker = UpdateChecker.shared
     @State private var route: ToolRoute
     @State private var isTargeted = false
     @State private var showingSettings: Bool
@@ -72,6 +73,9 @@ struct ContentView: View {
                     .padding(3)
                     .allowsHitTesting(false)
             }
+        }
+        .onAppear {
+            updateChecker.checkOnLaunchIfNeeded()
         }
         .sheet(isPresented: $showingPasteURL) {
             PasteURLPanel(isPresented: $showingPasteURL,

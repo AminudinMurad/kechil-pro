@@ -1,6 +1,6 @@
 # Installing Kechil PRO
 
-The current public release is [Kechil PRO v1.0.0 (build 1)](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.0).
+The current public release is [Kechil PRO v1.0.1 (build 2)](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1).
 The repository is [github.com/AminudinMurad/kechil-pro](https://github.com/AminudinMurad/kechil-pro).
 
 ## Requirements
@@ -12,19 +12,19 @@ macOS 13 (Ventura) or later, on Apple Silicon or Intel.
 Verify the sidecar before opening the release, then drag the app to Applications:
 
 ```bash
-shasum -a 256 -c Kechil-PRO-v1.0.0-macos-universal.dmg.sha256
-open Kechil-PRO-v1.0.0-macos-universal.dmg
+shasum -a 256 -c Kechil-PRO-v1.0.1-macos-universal.dmg.sha256
+open Kechil-PRO-v1.0.1-macos-universal.dmg
 ```
 
-Download the [universal DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.dmg),
-the [universal ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.zip),
-and their matching [DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.dmg.sha256)
-and [ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.zip.sha256)
-checksum sidecars from the [release page](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.0).
+Download the [universal DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.dmg),
+the [universal ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.zip),
+and their matching [DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.dmg.sha256)
+and [ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.zip.sha256)
+checksum sidecars from the [release page](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1).
 The DMG is the recommended Finder installation path; the ZIP is useful when a
 direct app bundle is preferred.
 
-The v1.0.0 package is ad-hoc signed, not signed with an Apple Developer ID and not
+The v1.0.1 package is ad-hoc signed, not signed with an Apple Developer ID and not
 notarised. Only bypass Gatekeeper for a copy you trust. The release notes document
 the signing boundary and the package verification evidence.
 
@@ -122,7 +122,7 @@ the preview primary; Selected actions capture the selected IDs and current setti
 before processing, so changing the selection during a run does not change its target.
 Clean All prepares every inspected file still waiting for cleanup, including items
 hidden by a findings filter. Clean's no-matching-metadata action is labelled
-**Prepare Copies** or **Prepare Selected Copy** instead of claiming metadata was removed.
+**Re-Save All** or **Re-Save Selected** instead of claiming metadata was removed.
 
 **Save All…** is green in the top toolbar and results header when prepared outputs
 are available. **Save Selected…** saves the selected prepared output(s): one file is
@@ -151,9 +151,9 @@ bookmark. Clear it in Settings to return Save All to asking for a destination ea
 
 The About card links to the GPL-3.0 terms and provides GitHub, GitHub Sponsors,
 Ko-fi and PayPal links for supporting open-source development. The GitHub button
-opens the Kechil PRO repository directly. The Updates button opens the latest
-GitHub release page when requested; automatic background update checking is not
-configured, so the app makes no update request on its own.
+opens the Kechil PRO repository directly. The Updates button checks the public
+GitHub latest release; Settings can also check automatically at launch. The app
+never downloads an update automatically and sends no media or account information.
 
 ## Uninstalling
 

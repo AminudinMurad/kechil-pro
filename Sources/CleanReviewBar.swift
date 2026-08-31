@@ -89,13 +89,13 @@ struct CleanReviewBar: View {
             return "Add \(media.title.lowercased()) to inspect their metadata."
         }
         if plannedChangeCount == 0 {
-            return "Prepare an explicitly labelled unchanged copy; no remux or metadata rewrite will run."
+            return "Re-save an explicitly labelled unchanged file; no remux or metadata rewrite will run."
         }
         return "\(plannedChangeCount) of \(readyCount) reviewed \(media.title.lowercased()) match the current selection."
     }
 
     private var compactStateDetail: String {
-        if isCleaning { return "Preparing and verifying copies" }
+        if isCleaning { return "Preparing and verifying outputs" }
         if isInspecting { return "Originals remain unchanged" }
         if readyCount == 0, preparedCount > 0 { return "\(preparedCount) ready to save" }
         if readyCount == 0 { return "Add files to inspect" }

@@ -1,8 +1,30 @@
 # Batch actions and logo defaults QA — 2026-08-31
 
-## Local follow-up verification
+## v1.0.1 release verification
 
-The working tree contains a local follow-up that has not been committed or pushed.
+The final source state is Kechil PRO v1.0.1 (build 2), published at
+https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1. The universal
+release packages and their sidecars were rebuilt after the final source gate:
+
+- DMG: `releases/Kechil-PRO-v1.0.1-macos-universal.dmg`
+- DMG SHA-256: `a5dfd77361dbedf5bc08ef1090706619da0b9292f774c46bc376d14c8bd72452`
+- DMG size: `5,161,305` bytes
+- ZIP: `releases/Kechil-PRO-v1.0.1-macos-universal.zip`
+- ZIP SHA-256: `f7f5af08798561959d236412c854fedeb235b88c7c2528a08f0f02959bb11a2f`
+- ZIP size: `4,476,106` bytes
+- Architecture: universal `x86_64 arm64`
+- Verification: `hdiutil verify`, read-only mounted DMG signature, extracted ZIP
+  signature, entitlements and sidecar checks all passed.
+
+The release includes the real output-size estimates, compact Optimize layouts,
+multi-file Save Selected, original-dimension truth, Re-Save no-match Clean actions,
+and a Klik PRO-style automatic GitHub release check. The update check is enabled by
+default, can be disabled in Settings, and never downloads an update automatically.
+
+## Historical local follow-up verification
+
+The following notes preserve the pre-publication development context. That follow-up
+was subsequently finalized in the v1.0.1 release above.
 Image Optimize now fully encodes the selected source for a live output-size estimate
 when its crop, resize, format or quality settings change. The measured estimate is
 shown separately from the prepared queue row; the row stays unchanged until the user
@@ -11,8 +33,7 @@ numeric controls, and empty Image Optimize/Image Watermark routes keep their set
 columns hidden until a source is queued.
 
 The authoritative `tools/check.sh` run passes with **117 real-media interaction
-assertions**. The local follow-up does not alter the public v1.0.0 package listed in
-the release record below.
+assertions**. The v1.0.1 package listed above was rebuilt after this gate.
 
 ## Scope
 
@@ -46,8 +67,8 @@ the toolbar, result headers, inspectors and queue rows. Optimize image/video row
 show the selected source's original dimensions until its current preview/output is
 actually rendered.
 
-For no-matching-metadata Clean inputs, the truthful action remains Prepare Copies
-or Prepare Selected Copy. Originals are not described as cleaned when nothing changes.
+For no-matching-metadata Clean inputs, the truthful action is Re-Save All or
+Re-Save Selected. Originals are not described as cleaned when nothing changes.
 
 Clean, Optimize and Watermark expose selected-source size feedback before saving.
 Clean measures its same-path cleaner or unchanged-copy result; Image Optimize fully

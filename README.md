@@ -27,16 +27,13 @@ workflow, support continued development and media-format testing:**
 
 </div>
 
-## Current source build
+## Current release
 
-The public `main` branch now contains the verified **Kechil PRO v1.0.1 (build 2)**
-source candidate. It follows the initial v1.0.0 release with measured output-size
-updates, predictable multi-file queues, and a more compact workspace for smaller
-MacBook screens. See the [v1.0.1 source commit](https://github.com/AminudinMurad/kechil-pro/commit/522a7c14984c095ada40b32eec6aac8d792e10a8).
-
-The latest downloadable GitHub release remains **v1.0.0 (build 1)** until v1.0.1
-is published as a tagged release. The installation links below intentionally point
-to the existing public package rather than to files that have not been published.
+The latest public GitHub release is **Kechil PRO v1.0.1 (build 2)**, following the
+initial v1.0.0 release with measured output-size updates, predictable multi-file
+queues, a more compact workspace for smaller MacBook screens, and a Klik PRO-style
+GitHub release check in Settings. Read the [complete v1.0.1 release notes](docs/RELEASE_NOTES_v1.0.1.md)
+or [view the public v1.0.1 release](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1).
 
 ## ✨ v1.0.1 (build 2) highlights
 
@@ -58,6 +55,8 @@ to the existing public package rather than to files that have not been published
   structure, compact preview sizing, and aligned Save All / Save Selected controls.
 - **Safer video cleaning** — provenance and exporter metadata are re-probed after
   cleaning, including no-match videos that must remain unchanged and saveable.
+- **Klik-style update checks** — Settings can check the latest public GitHub release
+  at launch, show “Update ready” when needed, and never download updates silently.
 
 ## Screenshots & product previews
 
@@ -175,25 +174,23 @@ For the source preview layout, see the [interactive media workspace preview](doc
 
 ## Install (pre-built release)
 
-The latest public release is **Kechil PRO v1.0.0 (build 1)**, provided as one
+The latest public release is **Kechil PRO v1.0.1 (build 2)**, provided as one
 universal macOS app for Apple Silicon and Intel Macs. The DMG is the recommended
-download; the ZIP contains the same app as an alternative. The newer v1.0.1/build 2
-source is already on `main`, but its package is not linked here until that version
-has been published as a GitHub Release.
+download; the ZIP contains the same app as an alternative.
 
-[**Download Kechil PRO v1.0.0**](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.0)
+[**Download Kechil PRO v1.0.1**](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1)
 
-- [Download the universal DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.dmg)
-- [Download the universal ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.zip)
-- [Download the DMG checksum](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.dmg.sha256)
-- [Download the ZIP checksum](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.zip.sha256)
-- [Read the complete v1.0.0 release notes](docs/RELEASE_NOTES_v1.0.0.md)
+- [Download the universal DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.dmg)
+- [Download the universal ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.zip)
+- [Download the DMG checksum](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.dmg.sha256)
+- [Download the ZIP checksum](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.zip.sha256)
+- [Read the complete v1.0.1 release notes](docs/RELEASE_NOTES_v1.0.1.md)
 
 Verify the matching archive before opening it:
 
 ~~~bash
-shasum -a 256 -c Kechil-PRO-v1.0.0-macos-universal.dmg.sha256
-shasum -a 256 -c Kechil-PRO-v1.0.0-macos-universal.zip.sha256
+shasum -a 256 -c Kechil-PRO-v1.0.1-macos-universal.dmg.sha256
+shasum -a 256 -c Kechil-PRO-v1.0.1-macos-universal.zip.sha256
 ~~~
 
 The initial release is ad-hoc signed for local distribution. It is not signed with
@@ -247,9 +244,10 @@ playback streams. Export media you own through YouTube Studio, Google Takeout or
 Meta Accounts Center, then add the resulting local file to Kechil.
 
 The About card links to the GPL-3.0 terms and the public Kechil PRO GitHub repository,
-alongside GitHub Sponsors, Ko-fi and PayPal. The About Updates action opens the latest
-GitHub release page when requested; automatic background update checking is not
-configured, so the app makes no update request on its own.
+alongside GitHub Sponsors, Ko-fi and PayPal. Settings can automatically check the
+public GitHub latest-release endpoint at launch, or the user can run the check
+manually. The app never downloads an update automatically and sends no media or
+account information with the check.
 
 ## AI provenance: evidence, not a trust verdict
 
@@ -299,13 +297,13 @@ The resulting app is at build/Kechil PRO.app; release packages are in releases/.
 
 ## Tested with
 
-The v1.0.1 (build 2) source currently on `main` passed the full verification gate.
-The public v1.0.0 package was separately checked as the downloadable release.
+The v1.0.1 (build 2) source and its public package passed the full verification gate.
 Coverage includes:
 
 | Area | Coverage |
 | --- | --- |
 | Shared actions | 29 assertions for exact widths, green states, Selected/All availability and busy behaviour |
+| Update checking | 6 assertions for semantic release-version comparison and tag normalisation |
 | Queue selection | 9 assertions for click, Command-click, Shift-click, captured IDs and mixed queues |
 | Real media interactions | 117 assertions across image/video Clean, Optimize, Watermark, playback, saving and source preservation |
 | Packaging | Universal arm64 + x86_64, hdiutil verify, ZIP integrity, checksum sidecars and strict/deep app signature verification |
@@ -313,8 +311,8 @@ Coverage includes:
 
 The full release evidence is in [the batch-actions QA report](docs/qa/BATCH_ACTIONS_QA_2026-08-31.md) and [the development handoff](docs/DEVELOPMENT_HANDOFF.md).
 
-The working tree may contain follow-up fixes after the public package. Build a new
-local candidate and rerun the verification commands before distributing it.
+The [v1.0.1 release notes](docs/RELEASE_NOTES_v1.0.1.md) record the published package
+hashes, signing boundary and final verification results.
 
 ## Project layout
 

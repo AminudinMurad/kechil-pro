@@ -9,7 +9,7 @@ struct CleanBatchActionState: Equatable {
 
     var canClean: Bool { readyCount > 0 && !isProcessing }
     var title: String {
-        readyCount > 0 && plannedChangeCount == 0 ? "Prepare Copies" : "Clean All"
+        readyCount > 0 && plannedChangeCount == 0 ? "Re-Save All" : "Clean All"
     }
 
     func cleanIfReady(_ action: () -> Void) {
@@ -76,7 +76,7 @@ struct CleanBatchFooter: View {
 
     private var selectedActionTitle: String {
         let suffix = selectedCount > 1 ? " (\(selectedCount))" : ""
-        return (selectedHasChanges ? "Clean Selected" : "Prepare Selected Copy") + suffix
+        return (selectedHasChanges ? "Clean Selected" : "Re-Save Selected") + suffix
     }
 
     private var detail: String {
@@ -84,7 +84,7 @@ struct CleanBatchFooter: View {
         if readyCount == 0, preparedCount > 0 { return "Outputs ready. Use Save All above to save them." }
         if readyCount == 0 { return "No inspected files waiting for cleanup." }
         let files = readyCount == 1 ? "1 inspected file" : "\(readyCount) inspected files"
-        if plannedChangeCount == 0 { return "No matching metadata. Prepare unchanged copies of \(files)." }
+        if plannedChangeCount == 0 { return "No matching metadata. Re-save unchanged files from \(files)." }
         return "\(files) · chosen metadata settings. Save outputs after cleaning."
     }
 }

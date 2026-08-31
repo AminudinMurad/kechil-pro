@@ -3,11 +3,11 @@ import SwiftUI
 struct SettingsPanel: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var sizer: DashboardSizer
+    @ObservedObject private var updateChecker = UpdateChecker.shared
     @Environment(\.openURL) private var openURL
-    @State private var showingUpdateNotice = false
+    @AppStorage(UpdateChecker.autoCheckKey) private var automaticUpdateChecks = true
 
     private let githubURL = URL(string: "https://github.com/AminudinMurad/kechil-pro")!
-    private let releasesURL = URL(string: "https://github.com/AminudinMurad/kechil-pro/releases/latest")!
     private let sponsorsURL = URL(string: "https://github.com/sponsors/aminudinmurad")!
     private let kofiURL = URL(string: "https://ko-fi.com/aminudinmurad")!
     private let paypalURL = URL(string: "https://www.paypal.com/paypalme/aminudinmurad")!
@@ -36,13 +36,22 @@ struct SettingsPanel: View {
         // The complete Settings stack fits below the smallest dashboard preset.
         // Keep it fully expanded so macOS does not add an inner scroll bar.
         .fixedSize(horizontal: false, vertical: true)
-        .alert("Updates", isPresented: $showingUpdateNotice) {
-            Button("Open Release Page") {
-                openURL(releasesURL)
+        .alert(item: $updateChecker.notice) { notice in
+            if let releaseURL = notice.releaseURL {
+                return Alert(
+                    title: Text(notice.title),
+                    message: Text(notice.message),
+                    primaryButton: .default(Text("Open Release Page")) {
+                        openURL(releaseURL)
+                    },
+                    secondaryButton: .cancel(Text("Later"))
+                )
             }
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Automatic update checking is not configured yet. Open the Kechil PRO release page to check for the latest version.")
+            return Alert(
+                title: Text(notice.title),
+                message: Text(notice.message),
+                dismissButton: .default(Text("OK"))
+            )
         }
     }
 
@@ -111,6 +120,22 @@ struct SettingsPanel: View {
                 .foregroundStyle(.tertiary)
                 .padding(.top, 8)
 
+            Toggle(isOn: $automaticUpdateChecks) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Automatically check for updates")
+                        .font(.system(size: 11.5, weight: .medium))
+                    Text("Check GitHub for a newer version at launch")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .onChange(of: automaticUpdateChecks) { enabled in
+                updateChecker.automaticChecksChanged(enabled)
+            }
+            .padding(.top, 10)
+
             HStack(alignment: .center, spacing: 12) {
                 Link(destination: licenseURL) {
                     Text(copyright)
@@ -123,14 +148,19 @@ struct SettingsPanel: View {
                 Spacer(minLength: 8)
 
                 Button {
-                    showingUpdateNotice = true
+                    if let releaseURL = updateChecker.updateAvailableURL {
+                        openURL(releaseURL)
+                    } else {
+                        updateChecker.checkManually()
+                    }
                 } label: {
-                    Label("Updates…", systemImage: "arrow.clockwise")
+                    Label(updateButtonTitle, systemImage: "arrow.clockwise")
                         .font(.system(size: 12, weight: .semibold))
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
-                .help("Open the latest Kechil PRO release page")
+                .disabled(updateChecker.isChecking)
+                .help(updateButtonHelp)
             }
             .padding(.top, 8)
         }
@@ -192,6 +222,19 @@ struct SettingsPanel: View {
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+    }
+
+    private var updateButtonTitle: String {
+        if updateChecker.isChecking { return "Checking…" }
+        if updateChecker.updateAvailableURL != nil { return "Update ready" }
+        return "Updates…"
+    }
+
+    private var updateButtonHelp: String {
+        if updateChecker.updateAvailableURL != nil {
+            return "Open the latest Kechil PRO GitHub release"
+        }
+        return "Check GitHub for a newer Kechil PRO release"
     }
 
     private var buildNumber: String {

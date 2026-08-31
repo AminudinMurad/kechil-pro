@@ -294,7 +294,7 @@ struct VideoCleanView: View {
                 .font(.system(size: 11, weight: .semibold))
             Text(plan.hasRequestedChanges
                  ? "\(plan.selectedEntryCount) inspected metadata item\(plan.selectedEntryCount == 1 ? "" : "s") match. No output exists yet; choose Clean Selected to create and verify one."
-                 : "No inspected metadata matches this selection. Clean Selected will only prepare an explicitly labelled unchanged copy.")
+                 : "No inspected metadata matches this selection. Re-Save Selected will only create an explicitly labelled unchanged file.")
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

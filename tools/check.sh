@@ -52,6 +52,13 @@ xcrun swiftc -sdk "$SDK" -module-cache-path "$OUT/module-cache" \
   "$ROOT/Tests/BatchActionChecks.swift"
 "$OUT/batch-action-checks"
 
+echo "==> Checking GitHub update version comparison"
+xcrun swiftc -sdk "$SDK" -module-cache-path "$OUT/module-cache" \
+  -parse-as-library -O -warnings-as-errors -target "$HOST_ARCH-apple-macosx13.0" \
+  -framework SwiftUI -o "$OUT/update-checker-checks" \
+  "$ROOT/Sources/UpdateChecker.swift" "$ROOT/Tests/UpdateCheckerChecks.swift"
+"$OUT/update-checker-checks"
+
 echo "==> Checking shared media queue selection"
 xcrun swiftc -sdk "$SDK" -module-cache-path "$OUT/module-cache" \
   -parse-as-library -O -warnings-as-errors -target "$HOST_ARCH-apple-macosx13.0" \
