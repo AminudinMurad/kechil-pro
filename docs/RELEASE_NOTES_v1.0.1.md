@@ -2,8 +2,7 @@
 
 Kechil PRO v1.0.1 is the first follow-up to the initial public release. It brings
 the media workflows to a consistent batch model, measures real output sizes as
-settings change, tightens the compact MacBook layouts, and adds a Klik PRO-style
-GitHub release check in Settings.
+settings change, and tightens the compact MacBook layouts.
 
 ## Downloads
 
@@ -72,18 +71,6 @@ approval flow for a downloaded app. The release does not claim notarisation.
   unchanged-file preparation.
 - Watermark and Optimize outputs pass through the supported metadata-removal path
   before the final save; Clean keeps byte-preserving paths where technically safe.
-
-### Klik PRO-style release checking
-
-- Settings now includes **Automatically check for updates**, enabled by default and
-  independently switchable.
-- At launch, the app reads the public GitHub latest-release endpoint and compares its
-  version with the installed app. It never downloads an update automatically.
-- The Updates button reports **Update ready**, **You're up to date**, or a connection
-  error. Opening the release page is always a user action.
-- The check sends no media, account information, telemetry or licensing data. The
-  existing sandbox network-client entitlement is used only for explicit direct-media
-  URL imports and this public release lookup; there is no network-server entitlement.
 
 ## Verification
 

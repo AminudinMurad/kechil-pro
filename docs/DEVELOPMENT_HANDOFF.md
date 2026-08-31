@@ -13,9 +13,9 @@ The final package and source gate passed with 117 real-media interaction asserti
 39 native UI snapshots, universal `x86_64 arm64` binaries, strict/deep signatures,
 and valid package checksums.
 
-The release also includes the Klik PRO-style public GitHub release check: automatic
-checking is enabled by default, can be disabled in Settings, and never downloads an
-update automatically. The in-app GitHub button opens the Kechil PRO repository.
+The release also includes a public GitHub release check: automatic checking is
+enabled by default, can be disabled in Settings, and never downloads an update
+automatically. The in-app GitHub button opens the Kechil PRO repository.
 
 ## 2026-08-31 v1.0.1 feature follow-up: Image Optimize live size and crop-row alignment
 

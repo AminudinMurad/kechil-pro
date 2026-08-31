@@ -1,10 +1,8 @@
 <div align="center">
 
-<img src="assets/icon.png" width="168" alt="Kechil PRO app icon showing a mountain, sun and green PRO badge">
+<img src="assets/social/kechil-pro-github-social-preview-v1.0.1.png" width="940" alt="Kechil PRO banner showing the app identity, Clean, Optimise and Watermark tools, and local processing on macOS">
 
 # Kechil PRO
-
-**Clean. Optimise. Watermark. Keep your media on your Mac.**
 
 Privacy-first, local-first macOS tools for cleaning metadata, optimising images and
 videos, applying visible watermarks, and seeing realistic output-size estimates as
@@ -31,8 +29,8 @@ workflow, support continued development and media-format testing:**
 
 The latest public GitHub release is **Kechil PRO v1.0.1 (build 2)**, following the
 initial v1.0.0 release with measured output-size updates, predictable multi-file
-queues, a more compact workspace for smaller MacBook screens, and a Klik PRO-style
-GitHub release check in Settings. Read the [complete v1.0.1 release notes](docs/RELEASE_NOTES_v1.0.1.md)
+queues, a more compact workspace for smaller MacBook screens, and GitHub release
+checks in Settings. Read the [complete v1.0.1 release notes](docs/RELEASE_NOTES_v1.0.1.md)
 or [view the public v1.0.1 release](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1).
 
 ## ✨ v1.0.1 (build 2) highlights
@@ -55,8 +53,8 @@ or [view the public v1.0.1 release](https://github.com/AminudinMurad/kechil-pro/
   structure, compact preview sizing, and aligned Save All / Save Selected controls.
 - **Safer video cleaning** — provenance and exporter metadata are re-probed after
   cleaning, including no-match videos that must remain unchanged and saveable.
-- **Klik-style update checks** — Settings can check the latest public GitHub release
-  at launch, show “Update ready” when needed, and never download updates silently.
+- **Release update checks** — Settings can check the latest public GitHub release at
+  launch, show “Update ready” when needed, and never download updates silently.
 
 ## Screenshots & product previews
 

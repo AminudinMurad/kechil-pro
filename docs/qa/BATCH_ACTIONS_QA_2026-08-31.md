@@ -18,8 +18,8 @@ release packages and their sidecars were rebuilt after the final source gate:
 
 The release includes the real output-size estimates, compact Optimize layouts,
 multi-file Save Selected, original-dimension truth, Re-Save no-match Clean actions,
-and a Klik PRO-style automatic GitHub release check. The update check is enabled by
-default, can be disabled in Settings, and never downloads an update automatically.
+and an automatic GitHub release check. The update check is enabled by default, can
+be disabled in Settings, and never downloads an update automatically.
 
 ## Historical local follow-up verification
 
