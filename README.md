@@ -15,6 +15,7 @@ settings change.
 ![Platform: macOS 13+](https://img.shields.io/badge/macOS-13%2B-black?logo=apple&logoColor=white)
 ![Built with SwiftUI](https://img.shields.io/badge/Swift-SwiftUI%20%2B%20AppKit-orange?logo=swift&logoColor=white)
 ![Runs locally](https://img.shields.io/badge/processing-local%20on%20your%20Mac-2ec458?logo=apple&logoColor=white)
+
 **Open source under the GNU General Public License v3.0. If Kechil PRO helps your
 workflow, support continued development and media-format testing:**
 
