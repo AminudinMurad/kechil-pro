@@ -5,8 +5,9 @@
 Follow-up to the batch-crop delivery: prominent green Save All in the toolbar and
 results headers, multi-file Save Selected, explicit Clean/Optimize/Watermark All and
 Selected, fixed processing footers, and image/video logo watermark defaults. Version/
-build remain 1.0.0 (1). There is no publication, upload, application installation,
-or change to originals.
+build remain 1.0.0 (1). The public GitHub release was published after the final
+source gate; no application was installed or replaced, and no originals were
+changed.
 
 Queue selection follows macOS conventions: a plain click selects one row,
 Command-click toggles a row, and Shift-click selects a range. The last clicked row
@@ -83,10 +84,16 @@ The replacement package was built and fully verified after the final source gate
   no network-server entitlement. The volume contains only `Kechil PRO.app` and
   the Applications shortcut.
 
-It is ad-hoc signed for local testing, not notarized or published. No app was
+It is ad-hoc signed, not notarised, and publicly published at
+https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.0. No app was
 installed or replaced during this package verification. A temporary generated build
 copy was moved to Trash after verification; the already-running Applications copy
 was intentionally not touched because it has a live queue.
+
+The public source repository is https://github.com/AminudinMurad/kechil-pro. The
+remote `main` branch and peeled `v1.0.0` tag matched the release source commit at
+publication. GitHub checksum sidecars were downloaded and compared byte-for-byte
+with the local sidecars, and the no-AI co-author metadata workflow passed.
 
 The pre-existing DMG failed its old sidecar
 check at the start of packaging: actual SHA-256

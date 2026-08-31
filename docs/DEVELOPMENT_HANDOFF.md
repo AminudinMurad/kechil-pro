@@ -62,14 +62,23 @@ The current replacement is `releases/Kechil-PRO-v1.0.0-macos-universal.dmg`,
 SHA-256 `0ddf449f7e3d56b19b9a0ea71e863e69529bee79a9247e0e775987fef3536516`,
 5,050,763 bytes, version/build 1.0.0 (1), x86_64 arm64. Its sidecar and disk-image
 checks pass; mounted read-only app signature/entitlements pass. It is ad-hoc signed,
-not notarized, unpublished and not installed. The historical checksum below is
-not the current release verification record.
+not notarised. It is publicly released at
+https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.0; no application was
+installed or replaced during this package verification. The historical checksum
+below is not the current release verification record.
 
 The matching universal ZIP is `releases/Kechil-PRO-v1.0.0-macos-universal.zip`,
 4,383,928 bytes, SHA-256
 `de35f12354cef7d25a4a75deaafe54cd5bf2426d1dd2624616e6cede8de31a5f`. Its sidecar,
 `unzip -tqq`, archive metadata check and embedded app signature all pass; it contains
 only `Kechil PRO.app`.
+
+The public source repository is https://github.com/AminudinMurad/kechil-pro. The
+remote `main` branch and peeled `v1.0.0` tag were verified against the release
+source commit `00794b11774a33ab72c06c9a0cb8897b5d8dc8cc` at publication. GitHub
+contains the DMG, DMG checksum sidecar, ZIP, and ZIP checksum sidecar; the
+published sidecars are byte-identical to the locally verified sidecars. The
+no-AI co-author metadata workflow also passed on the publication push.
 
 ## 2026-08-31 batch crop and playback verification
 
