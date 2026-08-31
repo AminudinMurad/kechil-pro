@@ -430,7 +430,7 @@ private struct ItemRow: View {
                         .foregroundStyle(.green)
                 } else if item.isSaveReady {
                     Button(item.isUnchangedCopy ? "Save Copy…" : "Save…", action: onSave)
-                        .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+                        .buttonStyle(KechilSaveButtonStyle())
                         .controlSize(.regular)
                 }
                 Button(action: onRemove) {

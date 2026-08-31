@@ -2,6 +2,26 @@
 
 Updated: 2026-08-31
 
+## 2026-08-31 local follow-up: Image Optimize live size and crop-row alignment
+
+This working-tree follow-up is intentionally local and has not been committed or
+pushed. Image Optimize now uses the same full `TransformPipeline` render and encoder
+as its live preview to populate an **Optimized output estimate** card. Crop, resize,
+format and quality changes cancel stale work, remeasure the selected source, and show
+the new encoded byte count without changing the prepared queue output. The queue row
+therefore remains the last committed result until Optimize Selected or Optimize All is
+pressed. The estimate is explicitly labelled as measured and not saved yet.
+
+The empty Image Optimize and Image Watermark routes still show only their upload/drop
+surface; settings columns appear after at least one source enters the queue. The custom
+crop `×` now aligns with the numeric input controls rather than the labels above them.
+
+The authoritative real-media interaction suite passes 117 assertions, including the
+new Optimize measurement and remeasurement checks. The 39 native UI snapshots render
+successfully; the populated Optimize view, custom crop row, and empty Optimize and
+Watermark routes were visually inspected. No release package or public GitHub state
+was changed by this follow-up.
+
 ## 2026-08-31 live Clean and Watermark size estimates
 
 Clean and Watermark now expose a selected-source output-size card before saving. Image
@@ -20,7 +40,7 @@ Sources/MediaSizeEstimate.swift and Sources/MediaSizeEstimateView.swift; the mod
 pipeline integrations are in ScrubModel, VideoCleanModel, TransformModel,
 VideoWatermarkModel, VideoCleanPipeline and VideoWatermarkPipeline.
 
-The focused real-media interaction suite passes 115 assertions, including exact Clean
+The focused real-media interaction suite passes 117 assertions, including exact Clean
 bytes, real image encoding, real video sampling, settings-change remeasurement and
 source-preservation checks. The visual renderer now produces 39 native SwiftUI
 snapshots, including a dedicated estimate-card state set; the relevant Clean and
@@ -49,7 +69,7 @@ Logo defaults are 90% opacity, 0-degree rotation, 40% scale, Centre placement,
 2.5% safe margin for images and videos. Text defaults remain unchanged. Session
 profiles preserve edits when switching kinds; saved image presets still override.
 
-Post-layout `tools/check.sh` passes, including 115 real-media interaction assertions,
+Post-layout `tools/check.sh` passes, including 117 real-media interaction assertions,
 9 shared selection assertions and 29 shared action-state checks. All 39 native
 snapshots render; six-route
 headers/footers, disabled/busy states, dark appearance and logo defaults were

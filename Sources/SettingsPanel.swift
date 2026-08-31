@@ -3,9 +3,11 @@ import SwiftUI
 struct SettingsPanel: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var sizer: DashboardSizer
+    @Environment(\.openURL) private var openURL
     @State private var showingUpdateNotice = false
 
-    private let githubURL = URL(string: "https://github.com/AminudinMurad")!
+    private let githubURL = URL(string: "https://github.com/AminudinMurad/kechil-pro")!
+    private let releasesURL = URL(string: "https://github.com/AminudinMurad/kechil-pro/releases/latest")!
     private let sponsorsURL = URL(string: "https://github.com/sponsors/aminudinmurad")!
     private let kofiURL = URL(string: "https://ko-fi.com/aminudinmurad")!
     private let paypalURL = URL(string: "https://www.paypal.com/paypalme/aminudinmurad")!
@@ -35,9 +37,12 @@ struct SettingsPanel: View {
         // Keep it fully expanded so macOS does not add an inner scroll bar.
         .fixedSize(horizontal: false, vertical: true)
         .alert("Updates", isPresented: $showingUpdateNotice) {
+            Button("Open Release Page") {
+                openURL(releasesURL)
+            }
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Update checking is not configured yet.")
+            Text("Automatic update checking is not configured yet. Open the Kechil PRO release page to check for the latest version.")
         }
     }
 
@@ -125,7 +130,7 @@ struct SettingsPanel: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
-                .help("Update checking is not configured yet")
+                .help("Open the latest Kechil PRO release page")
             }
             .padding(.top, 8)
         }

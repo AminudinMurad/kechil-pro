@@ -59,6 +59,13 @@ final class TransformModel: ObservableObject {
     @Published private(set) var optimizePreviewStatus: String?
     @Published private(set) var optimizePreviewError: String?
     @Published private(set) var isOptimizePreviewRendering = false
+    /// Live size for the selected image using the same complete Optimize render and
+    /// encoder as the preview. It is separate from queue output so changing a
+    /// control never silently replaces an already prepared result.
+    @Published private(set) var optimizeSizeEstimate: MediaSizeEstimate?
+    @Published private(set) var optimizeSizeEstimateItemID: UUID?
+    @Published private(set) var isOptimizeSizeEstimating = false
+    @Published private(set) var optimizeSizeEstimateError: String?
     /// Live size for the selected image using the full Watermark image encoder.
     /// It is intentionally separate from queue output so changing a control
     /// never silently replaces an already prepared result.
@@ -542,7 +549,8 @@ final class TransformModel: ObservableObject {
 
     /// Re-renders only the selected image after a control changes. The short debounce
     /// keeps slider drags responsive while avoiding one full encode per mouse event.
-    /// Queue items and their export data remain untouched until Apply to All is pressed.
+    /// The encoded bytes also drive the live estimate card. Queue items and their
+    /// export data remain untouched until Apply to All or Apply to Selected is pressed.
     func refreshOptimizePreview() {
         guard !watermarkMode else { return }
         optimizePreviewTask?.cancel()
@@ -558,19 +566,33 @@ final class TransformModel: ObservableObject {
         optimizePreviewError = nil
         optimizePreviewStatus = nil
         isOptimizePreviewRendering = true
+        optimizeSizeEstimateItemID = selected.id
+        optimizeSizeEstimate = nil
+        optimizeSizeEstimateError = nil
+        isOptimizeSizeEstimating = true
         optimizePreviewTask = Task { [weak self] in
             do {
                 try await Task.sleep(nanoseconds: 140_000_000)
                 try Task.checkCancellation()
-                let output = try await Task.detached(priority: .userInitiated) {
+                let result = try await Task.detached(priority: .userInitiated) {
                     let source = try Data(contentsOf: selected.sourceURL)
-                    return try TransformPipeline.process(source, settings: settings)
+                    return (sourceBytes: Int64(source.count),
+                            output: try TransformPipeline.process(source, settings: settings))
                 }.value
                 try Task.checkCancellation()
-                let image = Self.thumbnail(from: output.data, maxSide: 1200)
+                let output = result.output
                 guard let self,
                       self.optimizePreviewGeneration == generation,
                       self.selectedItemID == selected.id else { return }
+                self.optimizeSizeEstimate = MediaSizeEstimate(
+                    sourceBytes: result.sourceBytes,
+                    estimatedBytes: Int64(output.data.count),
+                    basis: .fullImageOptimizeEncode,
+                    detail: "Measured by fully encoding the selected image with the current Optimize settings; it is not saved yet.")
+                self.optimizeSizeEstimateError = nil
+                self.isOptimizeSizeEstimating = false
+
+                let image = Self.thumbnail(from: output.data, maxSide: 1200)
                 guard let image else {
                     self.optimizePreview = nil
                     self.optimizePreviewError = "Could not create the optimized preview"
@@ -592,6 +614,9 @@ final class TransformModel: ObservableObject {
                       self.optimizePreviewGeneration == generation,
                       self.selectedItemID == selected.id else { return }
                 self.optimizePreviewError = error.localizedDescription
+                self.optimizeSizeEstimate = nil
+                self.optimizeSizeEstimateError = error.localizedDescription
+                self.isOptimizeSizeEstimating = false
                 self.isOptimizePreviewRendering = false
             }
         }
@@ -608,6 +633,10 @@ final class TransformModel: ObservableObject {
         optimizePreviewStatus = nil
         optimizePreviewError = nil
         isOptimizePreviewRendering = false
+        optimizeSizeEstimate = nil
+        optimizeSizeEstimateItemID = nil
+        optimizeSizeEstimateError = nil
+        isOptimizeSizeEstimating = false
     }
 
     func refreshWatermarkPreview() {

@@ -40,7 +40,9 @@ struct CleanReviewBar: View {
                     .foregroundStyle(.secondary)
                     .frame(minWidth: 104)
             } else {
-                Button(actionTitle, action: clean)
+                Button(action: clean) {
+                    Label(actionTitle, systemImage: actionSymbol)
+                }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .frame(minWidth: 104)
@@ -58,6 +60,10 @@ struct CleanReviewBar: View {
     private var actionTitle: String {
         CleanBatchActionState(readyCount: readyCount, plannedChangeCount: plannedChangeCount,
                               isProcessing: isInspecting || isCleaning).title
+    }
+
+    private var actionSymbol: String {
+        plannedChangeCount > 0 ? "checkmark.shield" : "doc.on.doc"
     }
 
     private var stateTitle: String {

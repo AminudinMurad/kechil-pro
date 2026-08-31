@@ -31,15 +31,21 @@ enum MediaContainerSanitizer {
     ]
 
     /// Replaces C2PA/JUMBF boxes with equal-sized `free` boxes and zeroes their
-    /// payload. Keeping every box length and byte offset intact protects media
-    /// data references while ensuring the credential bytes cannot be recovered
-    /// from the cleaned output.
+    /// payload. When `removingAllMetadataItems` is true, every item under an
+    /// `ilst` metadata container is neutralized as well. AVAssetExportSession
+    /// can add a new `Software` item after its metadata array is applied, so
+    /// this final container pass is required for an honest all-metadata result.
+    /// Keeping every box length and byte offset intact protects media data
+    /// references while ensuring the removed bytes cannot be recovered from the
+    /// cleaned output.
     static func neutralizeC2PABMFFBoxes(in data: Data,
-                                      includingAIMetadataItems: Bool = true) -> (data: Data, count: Int) {
+                                      includingAIMetadataItems: Bool = true,
+                                      removingAllMetadataItems: Bool = false) -> (data: Data, count: Int) {
         var bytes = [UInt8](data)
         var removed = 0
         scan(bytes: &bytes, start: 0, end: bytes.count, removed: &removed,
-             includingAIMetadataItems: includingAIMetadataItems)
+             includingAIMetadataItems: includingAIMetadataItems,
+             removingAllMetadataItems: removingAllMetadataItems)
         return (Data(bytes), removed)
     }
 
@@ -67,7 +73,8 @@ enum MediaContainerSanitizer {
     }
 
     private static func scan(bytes: inout [UInt8], start: Int, end: Int,
-                             removed: inout Int, includingAIMetadataItems: Bool) {
+                             removed: inout Int, includingAIMetadataItems: Bool,
+                             removingAllMetadataItems: Bool) {
         var offset = start
         while offset + 8 <= end {
             guard let parsed = parseBox(bytes: bytes, offset: offset, end: end) else { return }
@@ -79,12 +86,16 @@ enum MediaContainerSanitizer {
                 bytes.replaceSubrange((offset + 4)..<(offset + 8), with: Array("free".utf8))
                 for index in (offset + header)..<boxEnd { bytes[index] = 0 }
                 removed += 1
-            } else if type == "ilst", includingAIMetadataItems {
+            } else if type == "ilst" {
                 // QuickTime item atoms use a numeric/opaque type rather than a
                 // printable fourCC. Inspect each item as metadata, and clear an
-                // AI-bearing item while retaining its box and offsets.
+                // AI-bearing item while retaining its box and offsets. For an
+                // all-metadata request, every child item is metadata regardless
+                // of its value, including exporter-generated Software entries.
                 scanILST(bytes: &bytes, start: offset + header, end: boxEnd,
-                         removed: &removed)
+                         removed: &removed,
+                         includingAIMetadataItems: includingAIMetadataItems,
+                         removingAllMetadataItems: removingAllMetadataItems)
             } else if containerTypes.contains(type) {
                 var childStart = offset + header
                 if type == "meta" {
@@ -99,7 +110,8 @@ enum MediaContainerSanitizer {
                 }
                 if childStart < boxEnd {
                     scan(bytes: &bytes, start: childStart, end: boxEnd, removed: &removed,
-                         includingAIMetadataItems: includingAIMetadataItems)
+                         includingAIMetadataItems: includingAIMetadataItems,
+                         removingAllMetadataItems: removingAllMetadataItems)
                 }
             }
 
@@ -193,14 +205,17 @@ enum MediaContainerSanitizer {
     }
 
     private static func scanILST(bytes: inout [UInt8], start: Int, end: Int,
-                                 removed: inout Int) {
+                                 removed: inout Int,
+                                 includingAIMetadataItems: Bool,
+                                 removingAllMetadataItems: Bool) {
         var offset = start
         while offset + 8 <= end {
             guard let parsed = parseBox(bytes: bytes, offset: offset, end: end) else { return }
             let (size, header, _) = parsed
             let boxEnd = offset + size
             let payload = bytes[(offset + header)..<boxEnd]
-            if hasAIMarker(payload) {
+            if removingAllMetadataItems || (includingAIMetadataItems && hasAIMarker(payload)) {
+                bytes.replaceSubrange((offset + 4)..<(offset + 8), with: Array("free".utf8))
                 for index in (offset + header)..<boxEnd { bytes[index] = 0 }
                 removed += 1
             }

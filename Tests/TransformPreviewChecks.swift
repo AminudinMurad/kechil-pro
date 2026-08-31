@@ -22,10 +22,16 @@ enum TransformPreviewChecks {
         try await waitUntil("square crop preview") {
             !model.isOptimizePreviewRendering &&
                 model.optimizePreviewItemID == itemID &&
-                model.optimizePreviewWidth != nil
+                model.optimizePreviewWidth != nil &&
+                !model.isOptimizeSizeEstimating &&
+                model.optimizeSizeEstimate != nil
         }
         expect(model.optimizePreviewWidth == model.optimizePreviewHeight,
                "changing crop settings updates the selected preview")
+        let squareEstimateBytes = model.optimizeSizeEstimate?.estimatedBytes
+        expect(model.optimizeSizeEstimate?.basis == .fullImageOptimizeEncode &&
+               (squareEstimateBytes ?? 0) > 0,
+               "Image Optimize exposes bytes from the real encoded preview output")
 
         model.resizeMode = .width
         model.resizeValue = 80
@@ -33,10 +39,14 @@ enum TransformPreviewChecks {
                "Image Optimize enables upscaling by default")
         model.refreshOptimizePreview()
         try await waitUntil("resize preview") {
-            !model.isOptimizePreviewRendering && model.optimizePreviewWidth == 80
+            !model.isOptimizePreviewRendering && model.optimizePreviewWidth == 80 &&
+                !model.isOptimizeSizeEstimating &&
+                model.optimizeSizeEstimate?.estimatedBytes != squareEstimateBytes
         }
         expect(model.optimizePreviewHeight ?? 0 > 0,
                "changing resize settings updates preview dimensions")
+        expect(model.optimizeSizeEstimate?.estimatedBytes != squareEstimateBytes,
+               "changing Optimize settings remeasures the encoded file size")
         expect(model.items.first?.width != 80,
                "live preview does not silently replace the queue output")
 

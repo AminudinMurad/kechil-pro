@@ -66,6 +66,7 @@ struct VideoCleanView: View {
                     ForEach(model.visibleItems) { item in
                         VideoCleanRow(item: item, selected: model.isSelected(item),
                                       select: { model.select(item, modifiers: NSEvent.modifierFlags) },
+                                      save: { model.save(item: item) },
                                       remove: { model.remove(item: item) })
                     }
                     if model.visibleItems.isEmpty, let filter = model.activeFilter {
@@ -232,7 +233,6 @@ struct VideoCleanView: View {
                         }
                             .buttonStyle(KechilSaveButtonStyle())
                             .controlSize(.regular)
-                            .frame(maxWidth: .infinity)
                     } else if let saved = item.savedTo {
                         Label("Saved as \(saved.lastPathComponent)", systemImage: "checkmark.circle.fill")
                             .font(.system(size: 10.5)).foregroundStyle(.green)
@@ -441,6 +441,7 @@ private struct VideoCleanRow: View {
     let item: VideoQueueItem
     let selected: Bool
     let select: () -> Void
+    let save: () -> Void
     let remove: () -> Void
 
     var body: some View {
@@ -475,6 +476,14 @@ private struct VideoCleanRow: View {
             VStack(alignment: .trailing, spacing: 6) {
                 if item.stage == .analysing || item.stage == .processing || item.stage == .cancelling {
                     ProgressView().controlSize(.small)
+                } else if item.savedTo != nil {
+                    Label("Saved", systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.green)
+                } else if item.isSaveReady {
+                    Button(item.verification == .unchanged ? "Save Copy…" : "Save…", action: save)
+                        .buttonStyle(KechilSaveButtonStyle())
+                        .controlSize(.regular)
                 }
                 Button(action: remove) { Image(systemName: "xmark") }
                     .buttonStyle(.borderless)

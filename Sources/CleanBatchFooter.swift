@@ -50,8 +50,9 @@ struct CleanBatchFooter: View {
                     guard canCleanSelected else { return }
                     cleanSelected()
                 } label: {
-                    Text(selectedActionTitle)
-                        .frame(maxWidth: .infinity)
+                    Label(selectedActionTitle, systemImage: selectedHasChanges
+                          ? "checkmark.shield" : "doc.on.doc")
+                        .frame(maxWidth: .infinity, minHeight: KechilActionMetrics.actionMinHeight)
                 }
                 .buttonStyle(.bordered)
                 .frame(maxWidth: .infinity, minHeight: KechilActionMetrics.actionMinHeight)

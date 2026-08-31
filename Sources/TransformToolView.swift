@@ -13,13 +13,22 @@ struct TransformToolView: View {
     }
 
     var body: some View {
-        HSplitView {
-            controls
-                .frame(minWidth: OptimizeWorkspaceLayout.settingsMinimumWidth,
-                       idealWidth: OptimizeWorkspaceLayout.settingsIdealWidth,
-                       maxWidth: OptimizeWorkspaceLayout.settingsMaximumWidth)
-            queue
-                .frame(minWidth: OptimizeWorkspaceLayout.outputMinimumWidth)
+        Group {
+            if model.items.isEmpty {
+                MediaEmptyState(media: .image, tool: .optimize,
+                                detail: "WebP is the default · crop, resize, convert and optimize",
+                                choose: model.chooseFiles,
+                                pasteURL: { model.add(urls: [$0]) })
+            } else {
+                HSplitView {
+                    controls
+                        .frame(minWidth: OptimizeWorkspaceLayout.settingsMinimumWidth,
+                               idealWidth: OptimizeWorkspaceLayout.settingsIdealWidth,
+                               maxWidth: OptimizeWorkspaceLayout.settingsMaximumWidth)
+                    queue
+                        .frame(minWidth: OptimizeWorkspaceLayout.outputMinimumWidth)
+                }
+            }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
@@ -97,8 +106,13 @@ struct TransformToolView: View {
                         if model.cropAspect == .custom {
                             HStack(spacing: 8) {
                                 cropDimensionField(.width)
-                                Text("×").font(.system(size: 11, weight: .semibold))
+                                Text("×").font(Font.system(size: 11, weight: .semibold))
                                     .foregroundStyle(.secondary)
+                                    // Align with the numeric controls, not the full
+                                    // Width/Height stacks that include their labels.
+                                    .alignmentGuide(VerticalAlignment.center) { dimensions in
+                                        dimensions[VerticalAlignment.center] - 12
+                                    }
                                 cropDimensionField(.height)
                             }
                             Toggle("Link target ratio", isOn: $model.locksCustomCropAspect)
@@ -208,59 +222,62 @@ struct TransformToolView: View {
     }
 
     private var queue: some View {
-        VStack(spacing: 0) {
-            BatchOutputHeader(queuedCount: model.items.count, readyCount: model.completedCount,
-                              isProcessing: model.isProcessing, save: model.saveAll,
-                              selectedName: model.selectedItemID == nil ? nil : model.selectedItem?.displayName,
-                              selectedCount: model.selectedItemCount,
-                              selectedReadyCount: model.selectedSaveCount,
-                              canSaveSelected: model.canSaveSelected, saveSelected: model.saveSelected)
-            Divider()
-
-            if model.items.isEmpty {
-                MediaEmptyState(media: .image, tool: .optimize,
-                                detail: "WebP is the default · crop, resize, convert and optimize",
-                                choose: model.chooseFiles,
-                                pasteURL: { model.add(urls: [$0]) })
-            } else {
-                optimizePreview
+        GeometryReader { geometry in
+            let usesCompactPreview = geometry.size.height < 800
+            VStack(spacing: 0) {
+                BatchOutputHeader(queuedCount: model.items.count, readyCount: model.completedCount,
+                                  isProcessing: model.isProcessing, save: model.saveAll,
+                                  selectedName: model.selectedItemID == nil ? nil : model.selectedItem?.displayName,
+                                  selectedCount: model.selectedItemCount,
+                                  selectedReadyCount: model.selectedSaveCount,
+                                  canSaveSelected: model.canSaveSelected, saveSelected: model.saveSelected)
                 Divider()
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(model.items) { item in
-                            TransformItemRow(item: item,
-                                             cropPrediction: model.cropPrediction(for: item),
-                                             selected: model.isSelected(item),
-                                             onSelect: { model.select(item, modifiers: NSEvent.modifierFlags) },
-                                             onSave: { model.save(item: item) },
-                                             onRemove: { model.remove(item: item) })
+
+                if model.items.isEmpty {
+                    MediaEmptyState(media: .image, tool: .optimize,
+                                    detail: "WebP is the default · crop, resize, convert and optimize",
+                                    choose: model.chooseFiles,
+                                    pasteURL: { model.add(urls: [$0]) })
+                } else {
+                    optimizePreview(compact: usesCompactPreview)
+                    Divider()
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(model.items) { item in
+                                TransformItemRow(item: item,
+                                                 cropPrediction: model.cropPrediction(for: item),
+                                                 selected: model.isSelected(item),
+                                                 onSelect: { model.select(item, modifiers: NSEvent.modifierFlags) },
+                                                 onSave: { model.save(item: item) },
+                                                 onRemove: { model.remove(item: item) })
+                            }
                         }
+                        .padding(14)
                     }
-                    .padding(14)
+                    .kechilScrollbars()
                 }
-                .kechilScrollbars()
-            }
 
-            if let status = model.statusMessage {
-                Divider()
-                Text(status)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let status = model.statusMessage {
+                    Divider()
+                    Text(status)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
     }
 
-    private var optimizePreview: some View {
-        VStack(spacing: 8) {
+    private func optimizePreview(compact: Bool) -> some View {
+        VStack(spacing: compact ? 5 : 8) {
             HStack {
                 Picker("Preview", selection: $showsOriginal) {
                     Text("Original").tag(true)
                     Text(model.cropAspect == .original ? "Optimized" : "Crop guide").tag(false)
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 210)
+                .pickerStyle(.segmented).labelsHidden().frame(width: compact ? 190 : 210)
                 Spacer()
                 Text(showsOriginal ? "Original" : (model.cropAspect != .original ? "Crop guide" : "Preview"))
                     .font(.system(size: 9.5, weight: .medium)).foregroundStyle(.secondary)
@@ -295,15 +312,26 @@ struct TransformToolView: View {
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
                 }
             }
-            .frame(maxWidth: .infinity).frame(height: 220)
+            .frame(maxWidth: .infinity).frame(height: compact ? 160 : 220)
             HStack {
                 Text(model.selectedItem?.displayName ?? "Select an image")
-                    .font(.system(size: 10.5, weight: .medium)).lineLimit(1).truncationMode(.middle)
+                    .font(.system(size: compact ? 9.5 : 10.5, weight: .medium)).lineLimit(1).truncationMode(.middle)
                 Spacer()
                 if let item = model.selectedItem, let dimensions = dimensionSummary(for: item) {
                     Text(dimensions)
-                        .font(.system(size: 9.5)).foregroundStyle(.secondary)
+                        .font(.system(size: compact ? 8.8 : 9.5)).foregroundStyle(.secondary)
                 }
+            }
+            if let selectedID = model.selectedItem?.id,
+               model.optimizeSizeEstimateItemID == selectedID,
+               model.optimizeSizeEstimate != nil || model.isOptimizeSizeEstimating ||
+                    model.optimizeSizeEstimateError != nil {
+                MediaSizeEstimateCard(
+                    title: "Optimized output estimate",
+                    estimate: model.optimizeSizeEstimate,
+                    isEstimating: model.isOptimizeSizeEstimating,
+                    error: model.optimizeSizeEstimateError,
+                    compact: compact)
             }
             if let error = model.optimizePreviewError, !showsOriginal {
                 Text("Preview unavailable: \(error)")
@@ -311,7 +339,7 @@ struct TransformToolView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(12)
+        .padding(compact ? 8 : 12)
     }
 
     private var previewSettingsKey: String {
@@ -619,7 +647,7 @@ private struct TransformItemRow: View {
                         .foregroundStyle(.green)
                 } else if item.outputData != nil {
                     Button("Save…", action: onSave)
-                        .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+                        .buttonStyle(KechilSaveButtonStyle())
                         .controlSize(.regular)
                 }
                 Button(action: onRemove) { Image(systemName: "xmark") }

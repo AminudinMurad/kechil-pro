@@ -1,10 +1,12 @@
 import Foundation
 
 /// Explains how a live size value was obtained. A video watermark estimate is
-/// deliberately distinguished from the exact byte count available after export.
+/// deliberately distinguished from the exact byte count available after export,
+/// as is the live Optimize measurement from a prepared queue output.
 enum MediaSizeEstimateBasis: String, Hashable, Sendable {
     case exactClean
     case fullImageEncode
+    case fullImageOptimizeEncode
     case realVideoSample
     case actualOutput
 
@@ -12,6 +14,7 @@ enum MediaSizeEstimateBasis: String, Hashable, Sendable {
         switch self {
         case .exactClean: return "Same Clean path measured"
         case .fullImageEncode: return "Same image encoder measured"
+        case .fullImageOptimizeEncode: return "Same Optimize encoder measured"
         case .realVideoSample: return "Real video sample measured"
         case .actualOutput: return "Prepared output measured"
         }

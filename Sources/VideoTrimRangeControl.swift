@@ -11,6 +11,7 @@ struct VideoTrimRangeControl: View {
     @Binding var endSeconds: Double?
     @Binding var playheadSeconds: Double
     let refreshPreview: () -> Void
+    var compact = false
 
     private enum Boundary: Equatable {
         case start
@@ -26,23 +27,26 @@ struct VideoTrimRangeControl: View {
         }
     }
 
-    private let horizontalInset: CGFloat = 24
-    private let timelineHeight: CGFloat = 72
+    private var horizontalInset: CGFloat { compact ? 18 : 24 }
+    private var timelineHeight: CGFloat { compact ? 54 : 72 }
+    private var timelineCenter: CGFloat { compact ? 23 : 30 }
     @State private var activeHandle: Boundary?
     @State private var isScrubbing = false
     @State private var lastPreviewRefresh = 0.0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: compact ? 4 : 7) {
             header
             timeline
             timingSummary
             controls
             Text(helperText)
-                .font(.system(size: 9.5))
+                .font(.system(size: compact ? 8.5 : 9.5))
                 .foregroundStyle(.tertiary)
+                .lineLimit(compact ? 1 : nil)
+                .truncationMode(.tail)
         }
-        .padding(10)
+        .padding(compact ? 7 : 10)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(nsColor: .controlBackgroundColor))
@@ -56,9 +60,9 @@ struct VideoTrimRangeControl: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Label("Trim", systemImage: isFullSource ? "arrow.left.and.right" : "scissors")
-                .font(.system(size: 11.5, weight: .semibold))
+                .font(.system(size: compact ? 10.5 : 11.5, weight: .semibold))
             Text(rangeTitle)
-                .font(.system(size: 10))
+                .font(.system(size: compact ? 9 : 10))
                 .foregroundStyle(.secondary)
             Spacer(minLength: 8)
             Text("\(Self.time(startSeconds)) – \(Self.time(effectiveEnd))")
@@ -80,14 +84,14 @@ struct VideoTrimRangeControl: View {
 
                 RoundedRectangle(cornerRadius: 5)
                     .fill(Color(nsColor: .separatorColor).opacity(0.62))
-                    .frame(width: usableWidth, height: 10)
-                    .position(x: horizontalInset + usableWidth / 2, y: 30)
+                    .frame(width: usableWidth, height: compact ? 8 : 10)
+                    .position(x: horizontalInset + usableWidth / 2, y: timelineCenter)
                     .allowsHitTesting(false)
 
                 RoundedRectangle(cornerRadius: 5)
                     .fill(Color.accentColor.opacity(0.72))
-                    .frame(width: max(2, endX - startX), height: 10)
-                    .position(x: startX + max(2, endX - startX) / 2, y: 30)
+                    .frame(width: max(2, endX - startX), height: compact ? 8 : 10)
+                    .position(x: startX + max(2, endX - startX) / 2, y: timelineCenter)
                     .allowsHitTesting(false)
 
                 scrubTarget(timelineWidth: timelineWidth, usableWidth: usableWidth)
@@ -110,15 +114,15 @@ struct VideoTrimRangeControl: View {
     private var timingSummary: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(Self.time(startSeconds))
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: compact ? 9 : 10, design: .monospaced))
                 .foregroundStyle(Color.accentColor)
             Spacer()
             Text("Preview \(Self.time(clampedPlayhead))")
-                .font(.system(size: 9.5, design: .monospaced))
+                .font(.system(size: compact ? 8.5 : 9.5, design: .monospaced))
                 .foregroundStyle(Color.orange)
             Spacer()
             Text(Self.time(effectiveEnd))
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: compact ? 9 : 10, design: .monospaced))
                 .foregroundStyle(Color.accentColor)
         }
     }
@@ -143,7 +147,8 @@ struct VideoTrimRangeControl: View {
             .help("Reset the trim range to the complete source")
             .disabled(isFullSource)
         }
-        .controlSize(.small)
+        .controlSize(compact ? .mini : .small)
+        .font(.system(size: compact ? 9.5 : 11))
     }
 
     private func ruler(usableWidth: CGFloat) -> some View {
@@ -164,8 +169,8 @@ struct VideoTrimRangeControl: View {
     private func scrubTarget(timelineWidth: CGFloat, usableWidth: CGFloat) -> some View {
         Color.clear
             .contentShape(Rectangle())
-            .frame(width: usableWidth, height: 50)
-            .position(x: timelineWidth / 2, y: 30)
+            .frame(width: usableWidth, height: compact ? 42 : 50)
+            .position(x: timelineWidth / 2, y: timelineCenter)
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .named("videoTrimTimeline"))
                     .onChanged { drag in
@@ -203,17 +208,17 @@ struct VideoTrimRangeControl: View {
         return VStack(spacing: 2) {
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.accentColor)
-                .frame(width: 16, height: 34)
+                .frame(width: compact ? 14 : 16, height: compact ? 28 : 34)
                 .overlay {
                     Image(systemName: boundary.systemImage)
-                        .font(.system(size: 8.5, weight: .bold))
+                        .font(.system(size: compact ? 7.5 : 8.5, weight: .bold))
                         .foregroundStyle(.white)
                 }
             Text(boundary.label)
-                .font(.system(size: 7.5, weight: .bold))
+                .font(.system(size: compact ? 7 : 7.5, weight: .bold))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
+                .padding(.horizontal, compact ? 4 : 5)
+                .padding(.vertical, compact ? 1 : 2)
                 .background(Color.accentColor, in: Capsule())
         }
         .frame(width: 44, height: timelineHeight)
@@ -256,12 +261,12 @@ struct VideoTrimRangeControl: View {
         ZStack(alignment: .top) {
             Circle()
                 .fill(Color.orange)
-                .frame(width: 10, height: 10)
-                .offset(y: 12)
+                .frame(width: compact ? 8 : 10, height: compact ? 8 : 10)
+                .offset(y: compact ? 9 : 12)
             RoundedRectangle(cornerRadius: 1)
                 .fill(Color.orange.opacity(0.95))
-                .frame(width: 2, height: 38)
-                .offset(y: 18)
+                .frame(width: 2, height: compact ? 28 : 38)
+                .offset(y: compact ? 14 : 18)
         }
         .frame(width: 14, height: timelineHeight, alignment: .top)
         .position(x: x, y: timelineHeight / 2)
@@ -280,7 +285,12 @@ struct VideoTrimRangeControl: View {
     }
     private var rangeTitle: String { isFullSource ? "Full source" : "Selected range" }
     private var helperText: String {
-        isFullSource
+        if compact {
+            return isFullSource
+                ? "Drag to preview; set In or Out to trim."
+                : "Drag the blue In and Out handles to trim."
+        }
+        return isFullSource
             ? "Drag the timeline to preview a frame, then set a start or end. Export uses the full source."
             : "Drag the blue In and Out handles to trim, or move the playhead and set either boundary."
     }

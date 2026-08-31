@@ -2,12 +2,6 @@ import AppKit
 import SwiftUI
 
 enum KechilActionMetrics {
-    /// Shared minimum width for Save, Save Selected and Save All. Longer
-    /// numbered labels may grow beyond this width without being clipped.
-    static let saveButtonMinWidth: CGFloat = 112
-    /// Header and row save controls use one exact width so the action column
-    /// never shifts when the selected-count label changes.
-    static let saveButtonWidth: CGFloat = 144
     static let actionMinHeight: CGFloat = 30
 }
 
@@ -44,7 +38,7 @@ struct BatchSaveButton: View {
             Label("Save All…", systemImage: "square.and.arrow.down")
                 .font(.system(size: 12, weight: .semibold))
         }
-        .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+        .buttonStyle(KechilSaveButtonStyle())
         .controlSize(.regular)
         .disabled(!state.canSave)
         .help(state.help)
@@ -62,12 +56,7 @@ struct KechilSaveButtonStyle: ButtonStyle {
     }
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .frame(minWidth: fixedWidth.map { $0 - 20 } ?? KechilActionMetrics.saveButtonMinWidth,
-                   maxWidth: fixedWidth.map { $0 - 20 } ?? .infinity,
-                   minHeight: KechilActionMetrics.actionMinHeight - 12)
-            .lineLimit(1)
-            .minimumScaleFactor(0.78)
+        sizedLabel(configuration.label)
             .padding(.horizontal, 10).padding(.vertical, 6)
             .foregroundStyle(Color.white.opacity(isEnabled ? 1 : 0.72))
             .background(RoundedRectangle(cornerRadius: 6).fill(
@@ -76,6 +65,23 @@ struct KechilSaveButtonStyle: ButtonStyle {
             .overlay(RoundedRectangle(cornerRadius: 6)
                 .fill(Color.black.opacity(configuration.isPressed && isEnabled ? 0.16 : 0)))
             .contentShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func sizedLabel(_ label: Configuration.Label) -> AnyView {
+        let height = KechilActionMetrics.actionMinHeight - 12
+        if let fixedWidth {
+            return AnyView(label
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .frame(minWidth: max(0, fixedWidth - 20),
+                       maxWidth: max(0, fixedWidth - 20),
+                       minHeight: height))
+        }
+        return AnyView(label
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(minHeight: height))
     }
 }
 
@@ -142,6 +148,15 @@ struct BatchOutputHeader: View {
                 if queuedCount > 0 {
                     BatchSaveButton(readyCount: readyCount, isProcessing: isProcessing,
                                     action: save)
+                    Button(saveSelectedTitle) {
+                        guard canSaveSelected && !isProcessing else { return }
+                        saveSelected()
+                    }
+                    .buttonStyle(KechilSaveButtonStyle())
+                    .controlSize(.regular)
+                    .disabled(!canSaveSelected || isProcessing)
+                    .help(saveSelectedHelp)
+                    .accessibilityHint(saveSelectedHelp)
                 }
             }
             if queuedCount > 0 {
@@ -149,20 +164,11 @@ struct BatchOutputHeader: View {
                     Text(selectionText)
                         .font(.system(size: 10)).foregroundStyle(.secondary)
                         .lineLimit(1).truncationMode(.middle)
-                    Spacer(minLength: 4)
-                    Button(saveSelectedTitle) {
-                        guard canSaveSelected && !isProcessing else { return }
-                        saveSelected()
-                    }
-                    .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
-                    .controlSize(.regular)
-                    .disabled(!canSaveSelected || isProcessing)
-                    .help(saveSelectedHelp)
-                    .accessibilityHint(saveSelectedHelp)
+                    Spacer(minLength: 0)
                 }
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
+        .padding(.horizontal, 14).padding(.vertical, 10)
         .background(Color(nsColor: .controlBackgroundColor))
     }
 }

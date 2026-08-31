@@ -29,8 +29,7 @@ struct UISnapshotRenderer {
             let view = ContentView(initialRoute: route)
             try render(view, size: CGSize(width: 940, height: 900),
                        to: outputDirectory.appendingPathComponent(
-                        route.id.replacingOccurrences(of: ".", with: "-") + ".png"),
-                       verifyCompactScrollers: route == .watermarkImages)
+                        route.id.replacingOccurrences(of: ".", with: "-") + ".png"))
         }
         try render(ContentView(initialRoute: .cleanImages),
                    size: DashboardMetrics.minimumContentSize,
@@ -741,6 +740,11 @@ private struct MediaSizeEstimateCardsSnapshot: View {
         estimatedBytes: 1_932_847,
         basis: .fullImageEncode,
         detail: "The selected image was fully encoded with the current format and quality.")
+    private let optimize = MediaSizeEstimate(
+        sourceBytes: 5_000_000,
+        estimatedBytes: 1_286_410,
+        basis: .fullImageOptimizeEncode,
+        detail: "The selected image was fully encoded with the current Optimize crop, resize, format and quality settings.")
     private let video = MediaSizeEstimate(
         sourceBytes: 80_000_000,
         estimatedBytes: 42_810_000,
@@ -766,6 +770,10 @@ private struct MediaSizeEstimateCardsSnapshot: View {
                                       error: nil)
                 MediaSizeEstimateCard(title: "Watermarked image estimate",
                                       estimate: image,
+                                      isEstimating: false,
+                                      error: nil)
+                MediaSizeEstimateCard(title: "Optimized image estimate",
+                                      estimate: optimize,
                                       isEstimating: false,
                                       error: nil)
                 MediaSizeEstimateCard(title: "Watermarked video estimate",

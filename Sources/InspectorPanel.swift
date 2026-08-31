@@ -64,7 +64,6 @@ struct InspectorPanel: View {
                     }
                         .buttonStyle(KechilSaveButtonStyle())
                         .controlSize(.regular)
-                        .frame(maxWidth: .infinity)
                 }
             }
             .padding(14)

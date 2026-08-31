@@ -102,6 +102,16 @@ enum VideoCleanSafetyChecks {
                "legacy broad/AI sanitizer retains intentional AI-item cleanup")
         expect(strict.data.count == structural.count && broad.data.count == structural.count,
                "both sanitizer modes preserve container size")
+
+        let softwareItem = box("©too", box("data", Data([0, 0, 0, 1, 0, 0, 0, 0]) + Data("Google".utf8)))
+        let generatedSoftware = box("moov", box("udta", box("meta", Data([0, 0, 0, 0]) +
+            box("ilst", softwareItem))))
+        let allMetadata = MediaContainerSanitizer.neutralizeC2PABMFFBoxes(
+            in: generatedSoftware, removingAllMetadataItems: true)
+        expect(allMetadata.data.range(of: Data("Google".utf8)) == nil && allMetadata.count == 1,
+               "all-metadata sanitizer removes exporter-generated Software ilst items")
+        expect(allMetadata.data.count == generatedSoftware.count,
+               "all-metadata ilst neutralization preserves container size")
         if failures > 0 { exit(1) }
         print("Video Clean safety checks passed")
     }

@@ -6,9 +6,18 @@ struct WatermarkToolView: View {
     @State private var previewMode = WatermarkPreviewMode.watermarked
 
     var body: some View {
-        HSplitView {
-            controls.frame(minWidth: 265, idealWidth: 305, maxWidth: 345)
-            previewAndQueue.frame(minWidth: 470)
+        Group {
+            if model.items.isEmpty {
+                MediaEmptyState(media: .image, tool: .watermark,
+                                detail: "Choose text or a logo, then export a new image",
+                                choose: model.chooseFiles,
+                                pasteURL: { model.add(urls: [$0]) })
+            } else {
+                HSplitView {
+                    controls.frame(minWidth: 265, idealWidth: 305, maxWidth: 345)
+                    previewAndQueue.frame(minWidth: 470)
+                }
+            }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .onChange(of: model.watermarkText) { _ in model.refreshWatermarkPreview() }
@@ -346,7 +355,7 @@ private struct WatermarkItemRow: View {
                         .font(.system(size: 11, weight: .medium)).foregroundStyle(.green)
                 } else if item.outputData != nil {
                     Button("Save…", action: onSave)
-                        .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+                        .buttonStyle(KechilSaveButtonStyle())
                         .controlSize(.regular)
                 }
                 Button(action: onRemove) { Image(systemName: "xmark") }

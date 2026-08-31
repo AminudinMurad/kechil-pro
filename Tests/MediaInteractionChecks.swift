@@ -159,13 +159,23 @@ enum MediaInteractionChecks {
         let queueBytes = model.items.map(\.outputData)
         model.refreshOptimizePreview()
         try await wait("fill-target preview") {
-            !model.isOptimizePreviewRendering && model.optimizePreviewWidth == 1400 && model.optimizePreviewHeight == 375
+            !model.isOptimizePreviewRendering && model.optimizePreviewWidth == 1400 &&
+                model.optimizePreviewHeight == 375 && !model.isOptimizeSizeEstimating &&
+                model.optimizeSizeEstimate != nil
         }
+        let fillTargetEstimate = model.optimizeSizeEstimate?.estimatedBytes
+        expect(model.optimizeSizeEstimate?.basis == .fullImageOptimizeEncode &&
+               (fillTargetEstimate ?? 0) > 0,
+               "image Optimize exposes bytes from a real encoded output")
         expect(model.items.map(\.outputData) == queueBytes, "live preview leaves committed queue output untouched")
         model.cropUpscalePolicy = .keepNative
         try await wait("native preview") {
-            !model.isOptimizePreviewRendering && model.optimizePreviewWidth == 600 && model.optimizePreviewHeight == 375
+            !model.isOptimizePreviewRendering && model.optimizePreviewWidth == 600 &&
+                model.optimizePreviewHeight == 375 && !model.isOptimizeSizeEstimating &&
+                model.optimizeSizeEstimate?.estimatedBytes != fillTargetEstimate
         }
+        expect(model.optimizeSizeEstimate?.estimatedBytes != fillTargetEstimate,
+               "image Optimize remeasures when crop settings change")
         expect(model.items.map(\.outputData) == queueBytes, "policy toggle does not silently apply to the batch")
         window.orderOut(nil)
         window.contentView = nil

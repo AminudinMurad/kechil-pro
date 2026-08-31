@@ -345,7 +345,7 @@ private struct VideoWatermarkRow: View {
             Spacer(minLength: 4)
             if item.isSaveReady {
                 Button("Save…", action: save)
-                    .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+                    .buttonStyle(KechilSaveButtonStyle())
                     .controlSize(.regular)
             }
             Button(action: remove) { Image(systemName: "xmark") }

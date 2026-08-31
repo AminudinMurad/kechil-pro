@@ -1,5 +1,19 @@
 # Batch actions and logo defaults QA — 2026-08-31
 
+## Local follow-up verification
+
+The working tree contains a local follow-up that has not been committed or pushed.
+Image Optimize now fully encodes the selected source for a live output-size estimate
+when its crop, resize, format or quality settings change. The measured estimate is
+shown separately from the prepared queue row; the row stays unchanged until the user
+confirms Optimize Selected or Optimize All. The custom crop `×` is aligned to the
+numeric controls, and empty Image Optimize/Image Watermark routes keep their settings
+columns hidden until a source is queued.
+
+The authoritative `tools/check.sh` run passes with **117 real-media interaction
+assertions**. The local follow-up does not alter the public v1.0.0 package listed in
+the release record below.
+
 ## Scope
 
 Follow-up to the batch-crop delivery: prominent green Save All in the toolbar and
@@ -35,11 +49,12 @@ actually rendered.
 For no-matching-metadata Clean inputs, the truthful action remains Prepare Copies
 or Prepare Selected Copy. Originals are not described as cleaned when nothing changes.
 
-Clean and Watermark also expose a selected-source size card before saving. Clean
-measures its same-path cleaner or unchanged-copy result; Image Watermark fully
-encodes the current settings; Video Watermark encodes a real short sample and
-projects it across the full duration. A prepared output replaces the estimate with
-its measured bytes, and changing settings never writes an output.
+Clean, Optimize and Watermark expose selected-source size feedback before saving.
+Clean measures its same-path cleaner or unchanged-copy result; Image Optimize fully
+encodes the current image settings; Image Watermark fully encodes the current
+watermark settings; Video Watermark encodes a real short sample and projects it across
+the full duration. A prepared output replaces the estimate with its measured bytes,
+and changing settings never writes an output.
 
 Logo defaults for images and videos: opacity 90%, rotation 0 degrees, scale 40%,
 Centre placement, safe margin 2.5%. Text defaults remain unchanged. Session-only
@@ -48,7 +63,7 @@ presets override defaults, and no logo bytes/paths are stored in presets.
 
 ## Verification status
 
-The final full `tools/check.sh` run passed, including **115 media interaction
+The final full `tools/check.sh` run passed, including **117 media interaction
 assertions**, **9 shared selection assertions** and **29 shared action-state
 assertions**. The final run includes the exact-width and multi-selection changes. A
 visual review identified

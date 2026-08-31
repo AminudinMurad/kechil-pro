@@ -1,5 +1,8 @@
 # Installing Kechil PRO
 
+The current public release is [Kechil PRO v1.0.0 (build 1)](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.0).
+The repository is [github.com/AminudinMurad/kechil-pro](https://github.com/AminudinMurad/kechil-pro).
+
 ## Requirements
 
 macOS 13 (Ventura) or later, on Apple Silicon or Intel.
@@ -9,16 +12,21 @@ macOS 13 (Ventura) or later, on Apple Silicon or Intel.
 Verify the sidecar before opening the release, then drag the app to Applications:
 
 ```bash
-shasum -a 256 -c Kechil-PRO-vX.Y.Z-macos-universal.dmg.sha256
-open Kechil-PRO-vX.Y.Z-macos-universal.dmg
+shasum -a 256 -c Kechil-PRO-v1.0.0-macos-universal.dmg.sha256
+open Kechil-PRO-v1.0.0-macos-universal.dmg
 ```
 
-The release also includes a ZIP containing the same universal app bundle and a
-matching `.zip.sha256` sidecar. The DMG is the recommended Finder installation
-path; the ZIP is useful when a direct app bundle is preferred.
+Download the [universal DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.dmg),
+the [universal ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.zip),
+and their matching [DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.dmg.sha256)
+and [ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.zip.sha256)
+checksum sidecars from the [release page](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.0).
+The DMG is the recommended Finder installation path; the ZIP is useful when a
+direct app bundle is preferred.
 
-An ad-hoc build is not notarised. Only bypass Gatekeeper for a copy you trust; a public
-release should be Developer ID signed and notarised.
+The v1.0.0 package is ad-hoc signed, not signed with an Apple Developer ID and not
+notarised. Only bypass Gatekeeper for a copy you trust. The release notes document
+the signing boundary and the package verification evidence.
 
 ## From source
 
@@ -75,9 +83,12 @@ codesign -d --entitlements - "build/Kechil PRO.app"
   supported video containers use a verified pass-through rewrite when available. Once a
   source is inspected, the selected-file card measures the same Clean path (or the exact
   unchanged-copy path) and updates when the Remove scope changes.
-- **Optimize:** crop/resize/convert images, or trim/crop/resize/compress videos. Video
-  target MB mode explains whether it protects quality by lowering resolution or keeps
-  resolution at the cost of visual quality. Size is an estimate, never an exact-byte claim.
+- **Optimize:** crop/resize/convert images, or trim/crop/resize/compress videos. Image
+  Optimize fully encodes the selected image and updates its live byte estimate when
+  crop, resize, format or quality settings change; the queued output remains unchanged
+  until Optimize Selected or Optimize All is pressed. Video target MB mode explains
+  whether it protects quality by lowering resolution or keeps resolution at the cost of
+  visual quality. Video size is an estimate, never an exact-byte claim.
 - **Watermark:** preview text or a logo before export, then position, colour, rotate,
   scale or tile it. Video marks are static across the full duration. Image Watermark
   fully encodes the selected image for its live estimate; Video Watermark encodes a real
@@ -137,6 +148,12 @@ Finder's Open With command sends supported images or videos to the corresponding
 mode of the active tool.
 The header settings gear can remember a default output folder using a security-scoped
 bookmark. Clear it in Settings to return Save All to asking for a destination each time.
+
+The About card links to the GPL-3.0 terms and provides GitHub, GitHub Sponsors,
+Ko-fi and PayPal links for supporting open-source development. The GitHub button
+opens the Kechil PRO repository directly. The Updates button opens the latest
+GitHub release page when requested; automatic background update checking is not
+configured, so the app makes no update request on its own.
 
 ## Uninstalling
 

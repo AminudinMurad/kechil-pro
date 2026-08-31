@@ -41,9 +41,22 @@ mkdir -p "$RELEASES"
 
 echo "==> Checking bundle"
 xattr -cr "$APP"
-xattr -d com.apple.FinderInfo "$APP" 2>/dev/null || true
-xattr -d 'com.apple.fileprovider.fpfs#P' "$APP" 2>/dev/null || true
-codesign --verify --deep --strict "$APP"
+SIGNATURE_OK=0
+for attempt in {1..20}; do
+  # File Provider can restore root Finder bookkeeping immediately after a
+  # recursive clear. Remove both root markers and verify repeatedly so a ZIP
+  # build cannot fail or ship a bundle whose signature is masked by metadata.
+  xattr -d com.apple.FinderInfo "$APP" 2>/dev/null || true
+  xattr -d 'com.apple.fileprovider.fpfs#P' "$APP" 2>/dev/null || true
+  if codesign --verify --deep --strict "$APP" 2>/dev/null; then
+    SIGNATURE_OK=1
+    break
+  fi
+done
+[[ "$SIGNATURE_OK" == "1" ]] || {
+  echo "error: app signature could not be verified after clearing File Provider metadata" >&2
+  exit 1
+}
 echo "    app signature OK"
 echo "    architectures: $ARCHS"
 

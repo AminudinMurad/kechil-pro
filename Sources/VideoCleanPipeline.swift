@@ -172,7 +172,9 @@ enum VideoCleanPipeline {
         if scope.needsC2PASanitization {
             let exported = try Data(contentsOf: outputURL)
             let sanitized = MediaContainerSanitizer.neutralizeC2PABMFFBoxes(
-                in: exported, includingAIMetadataItems: scope.removesAIMetadataItems)
+                in: exported,
+                includingAIMetadataItems: scope.removesAIMetadataItems,
+                removingAllMetadataItems: scope.removesAll)
             if sanitized.count > 0 {
                 try sanitized.data.write(to: outputURL, options: .atomic)
             }

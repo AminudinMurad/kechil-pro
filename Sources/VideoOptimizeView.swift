@@ -120,18 +120,21 @@ struct VideoOptimizeView: View {
 
     private var workspace: some View {
         GeometryReader { geometry in
-            let usesCompactPreview = geometry.size.height < 620
+            // The 13-inch M1 preset leaves roughly 650–700 pt for this workspace
+            // after the dashboard headers. Compact mode must begin well above the
+            // absolute minimum so the queue remains visible beside the trim editor.
+            let usesCompactPreview = geometry.size.height < 800
             VStack(spacing: 0) {
                 // Reserve space for the output header and a usable queue at the
                 // minimum window height. Trim remains reachable by scrolling here.
+                queueHeader
+                Divider()
                 ScrollView {
                     preview(compact: usesCompactPreview)
                 }
                 .kechilScrollbars()
-                .frame(height: max(180, min(usesCompactPreview ? 440 : 520,
+                .frame(height: max(180, min(usesCompactPreview ? 390 : 520,
                                            geometry.size.height - 180)))
-                Divider()
-                queueHeader
                 Divider()
                 ScrollView {
                     LazyVStack(spacing: 8) {
@@ -191,14 +194,15 @@ struct VideoOptimizeView: View {
                     .allowsHitTesting(false)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: compact ? 160 : 225)
+            .frame(height: compact ? 145 : 225)
             if let duration = sourceDuration {
                 playbackControls(duration: duration)
                 VideoTrimRangeControl(duration: duration,
                                       startSeconds: $model.settings.trimStartSeconds,
                                       endSeconds: $model.settings.trimEndSeconds,
                                       playheadSeconds: $model.previewSeconds,
-                                      refreshPreview: model.refreshPreview)
+                                      refreshPreview: model.refreshPreview,
+                                      compact: compact)
             }
             if let item = model.selectedItem, let descriptor = item.descriptor {
                 VStack(spacing: 3) {
@@ -410,7 +414,7 @@ private struct VideoOptimizeRow: View {
             Spacer(minLength: 4)
             if item.isSaveReady {
                 Button("Save…", action: save)
-                    .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+                    .buttonStyle(KechilSaveButtonStyle())
                     .controlSize(.regular)
             }
             Button(action: remove) { Image(systemName: "xmark") }
