@@ -40,6 +40,40 @@ xcrun swiftc \
   "$ROOT"/Sources/*.swift
 echo "    Swift OK"
 
+echo "==> Checking build and release scripts"
+bash -n "$ROOT/tools/build-app.sh" "$ROOT/tools/make-dmg.sh" "$ROOT/tools/make-zip.sh"
+echo "    shell syntax OK"
+
+echo "==> Checking shared Save All and Clean All actions"
+xcrun swiftc -sdk "$SDK" -module-cache-path "$OUT/module-cache" \
+  -parse-as-library -O -warnings-as-errors -target "$HOST_ARCH-apple-macosx13.0" \
+  -framework SwiftUI -framework AppKit -o "$OUT/batch-action-checks" \
+  "$ROOT/Sources/BatchSaveControls.swift" "$ROOT/Sources/CleanBatchFooter.swift" \
+  "$ROOT/Tests/BatchActionChecks.swift"
+"$OUT/batch-action-checks"
+
+echo "==> Checking shared media queue selection"
+xcrun swiftc -sdk "$SDK" -module-cache-path "$OUT/module-cache" \
+  -parse-as-library -O -warnings-as-errors -target "$HOST_ARCH-apple-macosx13.0" \
+  -framework AppKit -o "$OUT/media-selection-checks" \
+  "$ROOT/Sources/MediaSelection.swift" "$ROOT/Tests/MediaSelectionChecks.swift"
+"$OUT/media-selection-checks"
+
+echo "==> Checking inspect-first Clean workflow contracts"
+xcrun swiftc \
+  -sdk "$SDK" \
+  -module-cache-path "$OUT/module-cache" \
+  -parse-as-library \
+  -O \
+  -warnings-as-errors \
+  -target "$HOST_ARCH-apple-macosx13.0" \
+  -framework CoreMedia \
+  -o "$OUT/clean-workflow-checks" \
+  "$ROOT/Sources/MediaContracts.swift" \
+  "$ROOT/Sources/CleanContracts.swift" \
+  "$ROOT/Tests/CleanWorkflowChecks.swift"
+"$OUT/clean-workflow-checks"
+
 echo "==> Checking image crop preview geometry"
 xcrun swiftc \
   -sdk "$SDK" \
@@ -54,6 +88,34 @@ xcrun swiftc \
   "$ROOT/Sources/MediaCropGuide.swift" \
   "$ROOT/Tests/MediaCropGuideChecks.swift"
 "$OUT/image-crop-geometry-checks"
+
+echo "==> Checking image crop enlargement policy"
+xcrun swiftc \
+  -sdk "$SDK" \
+  -module-cache-path "$OUT/module-cache" \
+  -parse-as-library \
+  -O \
+  -warnings-as-errors \
+  -target "$HOST_ARCH-apple-macosx13.0" \
+  -framework CoreGraphics \
+  -o "$OUT/image-crop-upscale-policy-checks" \
+  "$ROOT/Sources/ImageCropGeometry.swift" \
+  "$ROOT/Tests/ImageCropUpscalePolicyChecks.swift"
+"$OUT/image-crop-upscale-policy-checks"
+
+echo "==> Checking Image Optimize upscaling policy"
+xcrun swiftc \
+  -sdk "$SDK" \
+  -module-cache-path "$OUT/module-cache" \
+  -parse-as-library \
+  -O \
+  -warnings-as-errors \
+  -target "$HOST_ARCH-apple-macosx13.0" \
+  -framework CoreGraphics \
+  -o "$OUT/image-resize-policy-checks" \
+  "$ROOT/Sources/ImageResizePolicy.swift" \
+  "$ROOT/Tests/ImageResizePolicyChecks.swift"
+"$OUT/image-resize-policy-checks"
 
 echo "==> Checking compact scrollbar geometry"
 xcrun swiftc \
@@ -108,6 +170,7 @@ xcrun swiftc \
   -framework AVFoundation \
   -o "$OUT/clean-preset-checks" \
   "$ROOT/Sources/MediaContracts.swift" \
+  "$ROOT/Sources/MediaContainerSanitizer.swift" \
   "$ROOT/Sources/VideoMetadataProbe.swift" \
   "$ROOT/Tests/CleanPresetChecks.swift"
 "$OUT/clean-preset-checks"
@@ -124,6 +187,7 @@ xcrun swiftc \
   -o "$OUT/video-clean-scope-checks" \
   "$ROOT/Sources/MediaContracts.swift" \
   "$ROOT/Sources/VideoCleanScope.swift" \
+  "$ROOT/Sources/MediaContainerSanitizer.swift" \
   "$ROOT/Sources/VideoMetadataProbe.swift" \
   "$ROOT/Tests/VideoCleanScopeChecks.swift"
 "$OUT/video-clean-scope-checks"
@@ -143,11 +207,56 @@ xcrun swiftc \
   "$ROOT/Sources/MetadataStripper.swift" \
   "$ROOT/Sources/MediaContainerSanitizer.swift" \
   "$ROOT/Sources/ImageIOStripper.swift" \
+  "$ROOT/Sources/ImageRenderingMetadata.swift" \
+  "$ROOT/Sources/PNGTextMetadata.swift" \
   "$ROOT/Sources/ProvenanceProbe.swift" \
   "$ROOT/Sources/CleanPreset.swift" \
   "$ROOT/Sources/ScopedMetadataStripper.swift" \
   "$ROOT/Tests/ScopedGPSImageChecks.swift"
 "$OUT/scoped-gps-image-checks"
+
+echo "==> Checking lossless image preservation and safe unsupported cases"
+xcrun swiftc \
+  -sdk "$SDK" \
+  -module-cache-path "$OUT/module-cache" \
+  -parse-as-library \
+  -O \
+  -warnings-as-errors \
+  -target "$HOST_ARCH-apple-macosx13.0" \
+  -framework ImageIO \
+  -framework Security \
+  -o "$OUT/image-preservation-checks" \
+  "$ROOT/Sources/MetadataStripper.swift" \
+  "$ROOT/Sources/MediaContainerSanitizer.swift" \
+  "$ROOT/Sources/ImageIOStripper.swift" \
+  "$ROOT/Sources/ImageRenderingMetadata.swift" \
+  "$ROOT/Sources/PNGTextMetadata.swift" \
+  "$ROOT/Sources/ProvenanceProbe.swift" \
+  "$ROOT/Tests/ImagePreservationChecks.swift"
+"$OUT/image-preservation-checks"
+
+echo "==> Checking scoped image AI decoding and mixed-field safety"
+xcrun swiftc \
+  -sdk "$SDK" \
+  -module-cache-path "$OUT/module-cache" \
+  -parse-as-library \
+  -O \
+  -warnings-as-errors \
+  -target "$HOST_ARCH-apple-macosx13.0" \
+  -framework ImageIO \
+  -framework Security \
+  -o "$OUT/scoped-image-safety-checks" \
+  "$ROOT/Sources/MediaContracts.swift" \
+  "$ROOT/Sources/MetadataStripper.swift" \
+  "$ROOT/Sources/MediaContainerSanitizer.swift" \
+  "$ROOT/Sources/ImageIOStripper.swift" \
+  "$ROOT/Sources/ImageRenderingMetadata.swift" \
+  "$ROOT/Sources/PNGTextMetadata.swift" \
+  "$ROOT/Sources/ProvenanceProbe.swift" \
+  "$ROOT/Sources/CleanPreset.swift" \
+  "$ROOT/Sources/ScopedMetadataStripper.swift" \
+  "$ROOT/Tests/ScopedImageSafetyChecks.swift"
+"$OUT/scoped-image-safety-checks"
 
 echo "==> Checking video trim, crop and target-size policy"
 xcrun swiftc \
@@ -191,6 +300,7 @@ xcrun swiftc \
   "$ROOT/Sources/MediaCapabilityProbe.swift" \
   "$ROOT/Sources/MediaContainerSanitizer.swift" \
   "$ROOT/Sources/VideoMetadataProbe.swift" \
+  "$ROOT/Sources/MediaSizeEstimate.swift" \
   "$ROOT/Sources/VideoCleanPipeline.swift" \
   "$ROOT/Sources/VideoOptimizeSettings.swift" \
   "$ROOT/Sources/VideoTranscodeEngine.swift" \
@@ -231,11 +341,35 @@ xcrun swiftc \
   "$ROOT/Sources/MediaCapabilityProbe.swift" \
   "$ROOT/Sources/MediaContainerSanitizer.swift" \
   "$ROOT/Sources/VideoMetadataProbe.swift" \
+  "$ROOT/Sources/MediaSizeEstimate.swift" \
   "$ROOT/Sources/VideoCleanPipeline.swift" \
   "$ROOT/Tests/ScopedVideoFixtureChecks.swift"
 "$OUT/scoped-video-checks" \
   "$ROOT/Test Samples/Kechil-OpenAI-Generative-ID-5s.mov" \
   "openai-test-genid-4f61d8b7-531e-4f19-9ea6-bf4191696e13"
+
+echo "==> Checking video Clean no-op and scope isolation"
+xcrun swiftc \
+  -sdk "$SDK" \
+  -module-cache-path "$OUT/module-cache" \
+  -parse-as-library \
+  -O \
+  -warnings-as-errors \
+  -target "$HOST_ARCH-apple-macosx13.0" \
+  -framework AVFoundation \
+  -framework AppKit \
+  -o "$OUT/video-clean-safety-checks" \
+  "$ROOT/Sources/MediaContracts.swift" \
+  "$ROOT/Sources/VideoCleanScope.swift" \
+  "$ROOT/Sources/MediaCapabilityProbe.swift" \
+  "$ROOT/Sources/MediaContainerSanitizer.swift" \
+  "$ROOT/Sources/VideoMetadataProbe.swift" \
+  "$ROOT/Sources/MediaSizeEstimate.swift" \
+  "$ROOT/Sources/VideoCleanPipeline.swift" \
+  "$ROOT/Sources/MediaSaveService.swift" \
+  "$ROOT/Tests/VideoCleanSafetyChecks.swift"
+"$OUT/video-clean-safety-checks" \
+  "$ROOT/Test Samples/Kechil-OpenAI-Generative-ID-5s.mov"
 
 echo "==> Checking dashboard preset geometry"
 xcrun swiftc \
@@ -274,6 +408,8 @@ xcrun swiftc \
   "$ROOT/Sources/MetadataStripper.swift" \
   "$ROOT/Sources/MediaContainerSanitizer.swift" \
   "$ROOT/Sources/ImageIOStripper.swift" \
+  "$ROOT/Sources/ImageRenderingMetadata.swift" \
+  "$ROOT/Sources/PNGTextMetadata.swift" \
   "$ROOT/Sources/ProvenanceProbe.swift" \
   "$ROOT/Tests/ProvenanceChecks.swift"
 "$OUT/provenance-checks"
@@ -386,4 +522,6 @@ else
 fi
 
 echo ""
+echo "==> Checking real crop exports, mixed-batch controls, and video playback"
+bash "$ROOT/tools/check-media-interactions.sh" "$OUT/media-interactions"
 echo "All checks passed."

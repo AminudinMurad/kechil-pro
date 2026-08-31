@@ -24,9 +24,26 @@ struct WatermarkToolView: View {
         .onChange(of: model.watermarkTileGapPercent) { _ in model.refreshWatermarkPreview() }
         .onChange(of: model.watermarkShadowEnabled) { _ in model.refreshWatermarkPreview() }
         .onChange(of: model.watermarkShadowOpacity) { _ in model.refreshWatermarkPreview() }
+        .onChange(of: model.selectedItemID) { _ in model.refreshWatermarkSizeEstimate() }
+        .onChange(of: model.watermarkEstimateSettingsKey) { _ in
+            model.refreshWatermarkSizeEstimate()
+        }
     }
 
     private var controls: some View {
+        VStack(spacing: 0) {
+            settingsControls
+            Divider()
+            ToolApplyActions(operation: "Watermark", canProcessAll: model.canProcessAll,
+                             canProcessSelected: model.canProcessSelected,
+                             processAll: model.reprocessAll, processSelected: model.reprocessSelected,
+                             selectedCount: model.selectedItemCount)
+                .padding(14)
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private var settingsControls: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Label("Watermark settings", systemImage: "slider.horizontal.3")
@@ -138,17 +155,8 @@ struct WatermarkToolView: View {
                     }
                 }
 
-                Button {
-                    model.reprocessAll()
-                } label: {
-                    Label("Apply Watermark to All", systemImage: "seal.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(model.items.isEmpty || model.isProcessing ||
-                          (model.watermarkKind == .logo && model.watermarkLogoData == nil))
 
-                Text("Settings apply to new images immediately. Use Apply Watermark to All to re-render this queue.")
+                Text("Settings apply to new images immediately. Watermark Selected updates the selected files; Watermark All updates the whole queue. Command-click or Shift-click rows for multiple files. Save outputs separately.")
                     .font(.system(size: 10.5))
                     .foregroundStyle(.tertiary)
             }
@@ -160,16 +168,12 @@ struct WatermarkToolView: View {
 
     private var previewAndQueue: some View {
         VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Watermarked output").font(.system(size: 13, weight: .semibold))
-                    Text("\(model.items.count) queued · \(model.completedCount) ready")
-                        .font(.system(size: 11)).foregroundStyle(.secondary)
-                }
-                Spacer()
-                if model.isProcessing { ProgressView().controlSize(.small) }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 12)
+            BatchOutputHeader(title: "Watermarked output", queuedCount: model.items.count,
+                              readyCount: model.completedCount, isProcessing: model.isProcessing,
+                              save: model.saveAll, selectedName: model.selectedItemID == nil ? nil : model.selectedItem?.displayName,
+                              selectedCount: model.selectedItemCount,
+                              selectedReadyCount: model.selectedSaveCount,
+                              canSaveSelected: model.canSaveSelected, saveSelected: model.saveSelected)
             Divider()
 
             if model.items.isEmpty {
@@ -183,8 +187,8 @@ struct WatermarkToolView: View {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(model.items) { item in
-                            WatermarkItemRow(item: item, selected: model.selectedItemID == item.id,
-                                             onSelect: { model.select(item) },
+                            WatermarkItemRow(item: item, selected: model.isSelected(item),
+                                             onSelect: { model.select(item, modifiers: NSEvent.modifierFlags) },
                                              onSave: { model.save(item: item) },
                                              onRemove: { model.remove(item: item) })
                         }
@@ -249,6 +253,14 @@ struct WatermarkToolView: View {
                 Text("Preview uses the same overlay renderer as export")
                     .font(.system(size: 9.5)).foregroundStyle(.tertiary)
             }
+            MediaSizeEstimateCard(
+                title: "Watermarked output estimate",
+                estimate: model.watermarkSizeEstimateItemID == model.selectedItem?.id
+                    ? model.watermarkSizeEstimate : nil,
+                isEstimating: model.watermarkSizeEstimateItemID == model.selectedItem?.id &&
+                    model.isWatermarkSizeEstimating,
+                error: model.watermarkSizeEstimateItemID == model.selectedItem?.id
+                    ? model.watermarkSizeEstimateError : nil)
         }
         .padding(12)
     }
@@ -332,7 +344,11 @@ private struct WatermarkItemRow: View {
                 if item.savedTo != nil {
                     Label("Saved", systemImage: "checkmark.circle.fill")
                         .font(.system(size: 11, weight: .medium)).foregroundStyle(.green)
-                } else if item.outputData != nil { Button("Save…", action: onSave).controlSize(.small) }
+                } else if item.outputData != nil {
+                    Button("Save…", action: onSave)
+                        .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+                        .controlSize(.regular)
+                }
                 Button(action: onRemove) { Image(systemName: "xmark") }
                     .buttonStyle(.borderless).controlSize(.small).foregroundStyle(.tertiary)
             }

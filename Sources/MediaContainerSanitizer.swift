@@ -20,26 +20,54 @@ enum MediaContainerSanitizer {
     ]
 
     private static let aiMarkers = [
-        "c2pa", "content credentials", "provenance", "openai", "generative ai",
+        // These are structured/generator-specific signals. Generic words such as
+        // “OpenAI”, “C2PA” or “provenance” are intentionally excluded because a
+        // normal title or description may mention them without being an AI field.
         "trainedalgorithmicmedia", "compositewithtrainedalgorithmicmedia",
+        "compositesynthetic", "claim_generator", "digitalsourcetype", "openai-test-genid",
+        "negative prompt", "sampler:", "cfg scale:", "model hash",
         "automatic1111", "stable diffusion", "comfyui", "invokeai", "midjourney",
-        "adobe firefly", "dall-e", "gpt-image", "negative prompt", "sampler:",
-        "cfg scale:", "model hash", "digital source type",
+        "adobe firefly", "dall-e", "gpt-image", "digital source type",
     ]
 
     /// Replaces C2PA/JUMBF boxes with equal-sized `free` boxes and zeroes their
     /// payload. Keeping every box length and byte offset intact protects media
     /// data references while ensuring the credential bytes cannot be recovered
     /// from the cleaned output.
-    static func neutralizeC2PABMFFBoxes(in data: Data) -> (data: Data, count: Int) {
+    static func neutralizeC2PABMFFBoxes(in data: Data,
+                                      includingAIMetadataItems: Bool = true) -> (data: Data, count: Int) {
         var bytes = [UInt8](data)
         var removed = 0
-        scan(bytes: &bytes, start: 0, end: bytes.count, removed: &removed)
+        scan(bytes: &bytes, start: 0, end: bytes.count, removed: &removed,
+             includingAIMetadataItems: includingAIMetadataItems)
         return (Data(bytes), removed)
     }
 
+    /// Reports a C2PA/JUMBF carrier only when it is found in a parsed BMFF box.
+    /// A raw string search is intentionally not used here: a perfectly ordinary
+    /// title or description can contain the word “C2PA” without carrying a
+    /// credential. This detector shares the same bounded box grammar as the
+    /// neutralizer so inspection and cleanup cannot disagree about the carrier.
+    static func containsC2PABMFFBoxes(in data: Data) -> Bool {
+        let bytes = [UInt8](data)
+        return containsC2PA(bytes: bytes, start: 0, end: bytes.count)
+    }
+
+    /// Returns a short printable excerpt from a structurally identified C2PA
+    /// box. This is inspection evidence only: signatures and binary bytes are
+    /// never exposed, and the caller still reports that credentials were not
+    /// cryptographically validated. Keeping this extraction in the same walker
+    /// prevents arbitrary title/description text from being mistaken for a
+    /// provenance carrier.
+    static func readableC2PAExcerpt(in data: Data, maxBytes: Int = 4096) -> String? {
+        guard maxBytes > 0 else { return nil }
+        let bytes = [UInt8](data)
+        return readableC2PAExcerpt(bytes: bytes, start: 0, end: bytes.count,
+                                   maxBytes: maxBytes)
+    }
+
     private static func scan(bytes: inout [UInt8], start: Int, end: Int,
-                             removed: inout Int) {
+                             removed: inout Int, includingAIMetadataItems: Bool) {
         var offset = start
         while offset + 8 <= end {
             guard let parsed = parseBox(bytes: bytes, offset: offset, end: end) else { return }
@@ -51,7 +79,7 @@ enum MediaContainerSanitizer {
                 bytes.replaceSubrange((offset + 4)..<(offset + 8), with: Array("free".utf8))
                 for index in (offset + header)..<boxEnd { bytes[index] = 0 }
                 removed += 1
-            } else if type == "ilst" {
+            } else if type == "ilst", includingAIMetadataItems {
                 // QuickTime item atoms use a numeric/opaque type rather than a
                 // printable fourCC. Inspect each item as metadata, and clear an
                 // AI-bearing item while retaining its box and offsets.
@@ -70,7 +98,8 @@ enum MediaContainerSanitizer {
                     }
                 }
                 if childStart < boxEnd {
-                    scan(bytes: &bytes, start: childStart, end: boxEnd, removed: &removed)
+                    scan(bytes: &bytes, start: childStart, end: boxEnd, removed: &removed,
+                         includingAIMetadataItems: includingAIMetadataItems)
                 }
             }
 
@@ -78,6 +107,89 @@ enum MediaContainerSanitizer {
             // parser returns that exact size, so this also guarantees progress.
             offset = boxEnd
         }
+    }
+
+    private static func containsC2PA(bytes: [UInt8], start: Int, end: Int) -> Bool {
+        var offset = start
+        while offset + 8 <= end {
+            guard let parsed = parseBox(bytes: bytes, offset: offset, end: end) else { return false }
+            let (size, header, type) = parsed
+            let boxEnd = offset + size
+            if isC2PA(type: type, bytes: bytes, payloadStart: offset + header,
+                      payloadEnd: boxEnd) {
+                return true
+            }
+            if containerTypes.contains(type) {
+                var childStart = offset + header
+                if type == "meta" {
+                    let fullBoxStart = childStart + 4
+                    if parseBox(bytes: bytes, offset: fullBoxStart, end: boxEnd) != nil {
+                        childStart = fullBoxStart
+                    }
+                }
+                if childStart < boxEnd,
+                   containsC2PA(bytes: bytes, start: childStart, end: boxEnd) {
+                    return true
+                }
+            }
+            offset = boxEnd
+        }
+        return false
+    }
+
+    private static func readableC2PAExcerpt(bytes: [UInt8], start: Int, end: Int,
+                                            maxBytes: Int) -> String? {
+        var offset = start
+        while offset + 8 <= end {
+            guard let parsed = parseBox(bytes: bytes, offset: offset, end: end) else { return nil }
+            let (size, header, type) = parsed
+            let boxEnd = offset + size
+            let payloadStart = offset + header
+            if isC2PA(type: type, bytes: bytes, payloadStart: payloadStart,
+                      payloadEnd: boxEnd) {
+                let bounded = bytes[payloadStart..<min(boxEnd, payloadStart + maxBytes)]
+                if let excerpt = readableExcerpt(bounded) { return excerpt }
+            }
+            if containerTypes.contains(type) {
+                var childStart = payloadStart
+                if type == "meta" {
+                    let fullBoxStart = childStart + 4
+                    if parseBox(bytes: bytes, offset: fullBoxStart, end: boxEnd) != nil {
+                        childStart = fullBoxStart
+                    }
+                }
+                if childStart < boxEnd,
+                   let excerpt = readableC2PAExcerpt(bytes: bytes, start: childStart,
+                                                     end: boxEnd, maxBytes: maxBytes) {
+                    return excerpt
+                }
+            }
+            offset = boxEnd
+        }
+        return nil
+    }
+
+    private static func readableExcerpt<C: Collection>(_ bytes: C) -> String?
+        where C.Element == UInt8 {
+        var sanitized = [UInt8]()
+        sanitized.reserveCapacity(bytes.count)
+        for byte in bytes {
+            if byte == 9 || byte == 10 || byte == 13 || (byte >= 32 && byte < 127) {
+                sanitized.append(byte)
+            } else {
+                sanitized.append(32)
+            }
+        }
+        let text = String(decoding: sanitized, as: UTF8.self)
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        let lower = text.lowercased()
+        guard ["openai", "sora", "genid", "c2pa", "claim_generator",
+               "digital source", "digitalsourcetype", "provenance"]
+            .contains(where: lower.contains) else { return nil }
+        return text.count > 360 ? String(text.prefix(357)) + "…" : text
     }
 
     private static func scanILST(bytes: inout [UInt8], start: Int, end: Int,

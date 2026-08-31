@@ -1,6 +1,139 @@
 # Kechil PRO development handoff
 
-Updated: 2026-08-30
+Updated: 2026-08-31
+
+## 2026-08-31 live Clean and Watermark size estimates
+
+Clean and Watermark now expose a selected-source output-size card before saving. Image
+Clean measures the same selected-scope cleaner used by export; when no selected field
+matches, it measures the exact unchanged-copy path. Image Watermark fully encodes the
+selected image with the current format, WebP and quality settings. Video Clean measures
+the same pass-through export path, and Video Watermark encodes a real short sample with
+the current codec, audio, container and quality settings before projecting the sample
+rate over the full duration.
+
+Changing the selected file or any relevant setting cancels stale work and starts a new
+measurement. The original source is never modified and setting changes do not create a
+saved output. Once an operation prepares an output, the card switches to that output's
+measured byte count and labels the basis clearly. The shared presentation lives in
+Sources/MediaSizeEstimate.swift and Sources/MediaSizeEstimateView.swift; the model and
+pipeline integrations are in ScrubModel, VideoCleanModel, TransformModel,
+VideoWatermarkModel, VideoCleanPipeline and VideoWatermarkPipeline.
+
+The focused real-media interaction suite passes 115 assertions, including exact Clean
+bytes, real image encoding, real video sampling, settings-change remeasurement and
+source-preservation checks. The visual renderer now produces 39 native SwiftUI
+snapshots, including a dedicated estimate-card state set; the relevant Clean and
+Watermark states were inspected before release packaging.
+
+## 2026-08-31 explicit batch actions and logo defaults
+
+Implemented All/Selected processing and Save Selected across all six routes.
+Selected now supports standard macOS queue selection: click one row, Command-click
+to toggle, or Shift-click a range. The last clicked row remains the preview primary,
+while Selected processing captures the selected IDs and current settings before work
+starts; changing the selection mid-run cannot expand the target. Button names are
+Clean, Optimize or Watermark Selected/All, with no Apply prefix. Clean's no-match
+actions remain Prepare Copies / Prepare Selected Copy. Save Selected writes one
+prepared output directly or, for multiple selected prepared outputs, asks once for a
+folder and writes separate collision-safe files. Save, Save Selected and Save All
+share one green style and exact width; Clean has equal-width queue footers and
+Optimize/Watermark have fixed settings footers, so their processing actions remain
+visible while scrolling.
+
+Optimize image and video rows show the selected source's original dimensions until
+that item's current preview/output is rendered, so selecting another queue item cannot
+leave the previous item's crop dimensions on screen.
+
+Logo defaults are 90% opacity, 0-degree rotation, 40% scale, Centre placement,
+2.5% safe margin for images and videos. Text defaults remain unchanged. Session
+profiles preserve edits when switching kinds; saved image presets still override.
+
+Post-layout `tools/check.sh` passes, including 115 real-media interaction assertions,
+9 shared selection assertions and 29 shared action-state checks. All 39 native
+snapshots render; six-route
+headers/footers, disabled/busy states, dark appearance and logo defaults were
+inspected. Compact Video Optimize now scrolls its preview/trim region to reserve
+visible space for the output header and queue. See
+`docs/qa/BATCH_ACTIONS_QA_2026-08-31.md` for evidence and current package status.
+
+The old batch-crop DMG failed its pre-rebuild sidecar check and was backed up.
+The current replacement is `releases/Kechil-PRO-v1.0.0-macos-universal.dmg`,
+SHA-256 `0ddf449f7e3d56b19b9a0ea71e863e69529bee79a9247e0e775987fef3536516`,
+5,050,763 bytes, version/build 1.0.0 (1), x86_64 arm64. Its sidecar and disk-image
+checks pass; mounted read-only app signature/entitlements pass. It is ad-hoc signed,
+not notarized, unpublished and not installed. The historical checksum below is
+not the current release verification record.
+
+The matching universal ZIP is `releases/Kechil-PRO-v1.0.0-macos-universal.zip`,
+4,383,928 bytes, SHA-256
+`de35f12354cef7d25a4a75deaafe54cd5bf2426d1dd2624616e6cede8de31a5f`. Its sidecar,
+`unzip -tqq`, archive metadata check and embedded app signature all pass; it contains
+only `Kechil PRO.app`.
+
+## 2026-08-31 batch crop and playback verification
+
+Image Optimize now separates custom-crop enlargement from post-crop Resize.
+**Enlarge smaller images to fill target** uses one uniform scale to cover both
+target dimensions, then crops exactly. Default-off keeps native pixels and
+explicitly reports smaller results. The shared target and linked ratio remain
+stable when selecting another batch item. The UI shows affected-image counts,
+per-row **Next crop** predictions, independent Resize enlargement, and `px`/`%`
+after numeric fields. Original mode hides the crop overlay. Live preview does not
+change committed output; Apply to All uses an immutable settings snapshot.
+
+Real output testing found and fixed a Core Image fractional-crop composition bug:
+a crop followed by a 200% resize could lose one border pixel. Aligning the custom
+crop origin before the single crop operation keeps exact dimensions through later
+resizing, including edge focus and rotated sources.
+
+`bash tools/check.sh` passes, including 63 new real export, hosted SwiftUI,
+mixed-batch, source-preservation, error-isolation and AVPlayer assertions.
+`tools/render-ui-snapshots.sh` renders 25 snapshots. Crop enlargement on/off,
+Original, compact crop, resize unit placement and compact playback controls were
+visually inspected. This is not a full responsiveness benchmark or Intel runtime
+acceptance. See `docs/qa/BATCH_CROP_QA_2026-08-31.md` for release verification.
+
+Historical batch-crop release: `releases/Kechil-PRO-v1.0.0-macos-universal.dmg`, **1.0.0 (1)**,
+**x86_64 arm64**, SHA-256
+`95adf2275ab6888479c20d17013e3a82848b907d5e717037983aa157bd35ac78`.
+Sidecar, disk-image integrity, mounted-app signature and sandbox entitlements pass.
+The app was click-tested directly from the read-only DMG (exact crop Apply, trailing
+Resize unit, playback and scrubbing). It remains ad-hoc signed, not notarized.
+The test app is closed, the DMG ejected, and the generated build app moved to Trash
+to avoid another searchable duplicate. No application was installed in this run.
+
+## 2026-08-31 inspect-first Clean delivery
+
+Milestones 0–2 from `docs/CLEAN_IMAGE_VIDEO_IMPLEMENTATION_PLAN.md` are now
+implemented in the working tree. In addition to the safety foundation, image and
+video Clean now follow an explicit inspect → review → clean → verify → save lifecycle.
+Import creates no modified output. Selection changes update cached plans without
+re-reading media, no-match inputs can prepare clearly labelled unchanged copies, and
+partial results cannot use the ordinary verified-save action.
+
+The shared lifecycle contract records source identity, selection revisions, plans,
+verification checks and receipts. Image inspection/cleaning runs off the main actor;
+cancellation is forwarded into detached work, and run identifiers prevent a cleared
+or superseded job from publishing stale state. Both media models revalidate the
+source before and after cleanup. Final saves use a bounded streaming byte comparison
+against the verified temporary artifact, including replacement saves, before the row
+can be marked Saved.
+
+The underlying Milestones 0–1 delivery includes bounded PNG `tEXt`/`zTXt`/`iTXt`
+decoding shared by provenance inspection and AI cleanup, mixed-field fail-closed
+handling, display-orientation preservation, explicit multi-frame/HEIC preservation
+limits, video no-op copies, structural C2PA detection/evidence, and credentials-only
+scope isolation for ordinary descriptive text. Checks cover JPEG orientations 1–8,
+PNG compressed text, mixed rights fields, animated/multipage limits, C2PA evidence,
+unchanged video copies, cancellation propagation and final-save byte identity.
+
+`bash tools/check.sh` passes with warnings treated as errors. This is source/test
+evidence. A signed host-architecture development app was built as part of UI snapshot
+generation, but no universal release app or DMG was packaged at that milestone. Twenty-two real SwiftUI
+snapshots were rendered and inspected, including image/video ready-for-review states.
+The deeper raw ISO-BMFF inventory and patcher, complete preservation receipts,
+measured responsiveness pass and optional metadata writing remain future milestones.
 
 ## Next major improvement plan
 
@@ -27,9 +160,10 @@ implementation dependency.
 - Do not add implementation attribution or automated-author trailers.
 - The window content width remains fixed at 940 pt and remains vertically resizable.
 
-The universal sandboxed app was built, installed at `/Applications/Kechil PRO.app`,
-strictly signature-verified and launched without changing version/build. No DMG was
-rebuilt during this pass.
+An earlier universal sandboxed app was installed at `/Applications/Kechil PRO.app`.
+That installation note is historical: the user subsequently requested removal of
+duplicate installations. Do not reinstall or create a second app copy merely for
+testing; use the current release verification record above for delivery status.
 
 ## Current product structure
 
@@ -165,8 +299,10 @@ Animated/keyframed marks and invisible/steganographic watermarks are outside sco
   accessibility, avoiding a control-tree rebuild and layout jump on every switch.
 - Image Clean mirrors Video Clean's section hierarchy with a shared Remove heading;
   its single-choice cards use the noun labels All metadata, AI metadata, EXIF and GPS.
-- Image Optimize custom crop width and height are independent pixels. Preview and
-  export share `ImageCropGeometry`; oversized values clamp independently per source.
+- Image Optimize custom crop width and height are independent, batch-stable target
+  pixels. Preview and export share `ImageCropGeometry`; Keep native size clamps each
+  source independently, while Enlarge smaller images to fill target uniformly scales
+  a smaller source before cropping to the exact target.
 - Resize mode defaults derive from the selected retained crop size (or 100% for
   Percentage). Do not restore the previous global 1600 px placeholder.
 - Video Optimize trim uses the `VideoTrimRangePolicy` In/Out marker contract. Start 0

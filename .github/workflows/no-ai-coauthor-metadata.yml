@@ -1,0 +1,35 @@
+name: No AI co-author metadata
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scan-commit-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject Claude or Anthropic co-author trailers
+        run: |
+          set -euo pipefail
+
+          git log HEAD --format=%B > "$RUNNER_TEMP/commit-messages.txt"
+          if grep -Eiq '^(Co-authored-by:[[:space:]]+.*(claude|anthropic)|.*<noreply@anthropic\.com>)' "$RUNNER_TEMP/commit-messages.txt"; then
+            echo "Claude/Anthropic co-author metadata is not allowed in this repository." >&2
+            exit 1
+          fi
+
+      - name: Reject Claude or Anthropic commit author or committer identities
+        run: |
+          set -euo pipefail
+
+          git log HEAD --format='%an <%ae>%n%cn <%ce>' > "$RUNNER_TEMP/commit-identities.txt"
+          if grep -Eiq 'claude|anthropic' "$RUNNER_TEMP/commit-identities.txt"; then
+            echo "Commits authored or committed by a Claude/Anthropic identity are not allowed in this repository." >&2
+            grep -Ei 'claude|anthropic' "$RUNNER_TEMP/commit-identities.txt" | sort -u >&2
+            exit 1
+          fi

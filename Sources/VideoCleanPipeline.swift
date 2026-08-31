@@ -46,14 +46,87 @@ enum VideoCleanPipeline {
     /// remains available for integrations and older tests.
     static func clean(sourceURL: URL,
                       selection: VideoCleanSelection) async throws -> VideoCleanResult {
-        try await clean(sourceURL: sourceURL, scope: .selection(selection))
+        try await clean(sourceURL: sourceURL, scope: .selection(selection),
+                        inspectedDescriptor: nil, inspectedReport: nil)
+    }
+
+    /// Inspect-first entry point. The model passes the cached descriptor/report so
+    /// an explicit Clean action does not immediately repeat both source probes.
+    static func clean(sourceURL: URL,
+                      selection: VideoCleanSelection,
+                      inspectedDescriptor: MediaAssetDescriptor,
+                      inspectedReport: VideoMetadataReport) async throws -> VideoCleanResult {
+        try await clean(sourceURL: sourceURL, scope: .selection(selection),
+                        inspectedDescriptor: inspectedDescriptor,
+                        inspectedReport: inspectedReport)
+    }
+
+    /// Measures the exact bytes produced by the inspect-first Clean path without
+    /// retaining or exposing a temporary output. A no-match scope is an exact
+    /// byte-for-byte copy, while a matching scope runs the same passthrough
+    /// exporter and then discards its temporary result.
+    static func estimateSize(sourceURL: URL,
+                             selection: VideoCleanSelection,
+                             inspectedDescriptor: MediaAssetDescriptor,
+                             inspectedReport: VideoMetadataReport) async throws -> MediaSizeEstimate {
+        try Task.checkCancellation()
+        let sourceBytes = max(inspectedDescriptor.fileSize,
+                              Int64((try? sourceURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0))
+        guard inspectedReport.removableFindings.contains(where: selection.matches) else {
+            return MediaSizeEstimate(
+                sourceBytes: sourceBytes,
+                estimatedBytes: sourceBytes,
+                basis: .exactClean,
+                detail: "No fields matched the \(selection.title.lowercased()) scope; Clean will prepare an unchanged byte-for-byte copy.")
+        }
+
+        let result = try await clean(sourceURL: sourceURL, selection: selection,
+                                     inspectedDescriptor: inspectedDescriptor,
+                                     inspectedReport: inspectedReport)
+        defer { try? FileManager.default.removeItem(at: result.outputURL) }
+        try Task.checkCancellation()
+        let outputBytes = Int64((try? result.outputURL.resourceValues(
+            forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        guard outputBytes > 0 else {
+            throw VideoPipelineError.verificationFailed("the temporary Clean output has no readable file size")
+        }
+        return MediaSizeEstimate(
+            sourceBytes: sourceBytes,
+            estimatedBytes: outputBytes,
+            basis: .exactClean,
+            detail: "Measured from the same passthrough Clean export; the temporary output is discarded after measurement.")
     }
 
     private static func clean(sourceURL: URL,
-                              scope: VideoRemovalScope) async throws -> VideoCleanResult {
+                              scope: VideoRemovalScope,
+                              inspectedDescriptor: MediaAssetDescriptor? = nil,
+                              inspectedReport: VideoMetadataReport? = nil) async throws -> VideoCleanResult {
         try Task.checkCancellation()
-        let inputDescriptor = try await MediaCapabilityProbe.inspectVideo(at: sourceURL)
-        let inputReport = try await VideoMetadataProbe.inspect(url: sourceURL)
+        let inputDescriptor: MediaAssetDescriptor
+        if let inspectedDescriptor { inputDescriptor = inspectedDescriptor }
+        else { inputDescriptor = try await MediaCapabilityProbe.inspectVideo(at: sourceURL) }
+        let inputReport: VideoMetadataReport
+        if let inspectedReport { inputReport = inspectedReport }
+        else { inputReport = try await VideoMetadataProbe.inspect(url: sourceURL) }
+        guard inputReport.removableFindings.contains(where: scope.matches) else {
+            // Keep a separately owned, byte-exact copy so fetched media can still
+            // be saved. An empty/no-match scope must never invoke a remux, which
+            // may discard unselected container data even with passthrough.
+            let outputURL = try VideoTemporaryFiles.makeURL(suffix: "unchanged",
+                                                            extension: sourceURL.pathExtension)
+            do {
+                try Task.checkCancellation()
+                try FileManager.default.copyItem(at: sourceURL, to: outputURL)
+                try Task.checkCancellation()
+                return VideoCleanResult(outputURL: outputURL,
+                                        outputDescriptor: inputDescriptor,
+                                        inputFindings: inputReport.findings,
+                                        remainingFindings: [], verification: .unchanged)
+            } catch {
+                try? FileManager.default.removeItem(at: outputURL)
+                throw error
+            }
+        }
         let asset = AVURLAsset(url: sourceURL)
         let exportPreset = AVAssetExportPresetPassthrough
         guard await AVAssetExportSession.compatibility(ofExportPreset: exportPreset,
@@ -98,7 +171,8 @@ enum VideoCleanPipeline {
         // provenance untouched.
         if scope.needsC2PASanitization {
             let exported = try Data(contentsOf: outputURL)
-            let sanitized = MediaContainerSanitizer.neutralizeC2PABMFFBoxes(in: exported)
+            let sanitized = MediaContainerSanitizer.neutralizeC2PABMFFBoxes(
+                in: exported, includingAIMetadataItems: scope.removesAIMetadataItems)
             if sanitized.count > 0 {
                 try sanitized.data.write(to: outputURL, options: .atomic)
             }
@@ -211,6 +285,16 @@ private enum VideoRemovalScope: Sendable {
         case .preset(let preset): return preset == .allMetadata || preset == .aiMetadata
         case .selection(let selection):
             return selection == .all || selection.contains(.contentCredentials)
+        }
+    }
+
+    var removesAIMetadataItems: Bool {
+        switch self {
+        case .preset(let preset): return preset == .allMetadata || preset == .aiMetadata
+        case .selection(let selection):
+            // The independent Content Credentials card must not wipe ordinary
+            // title/comment items merely because their text mentions AI.
+            return selection == .all
         }
     }
 

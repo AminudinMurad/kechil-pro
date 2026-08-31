@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import CoreMedia
 import Foundation
 import UniformTypeIdentifiers
@@ -6,20 +7,65 @@ import UniformTypeIdentifiers
 @MainActor
 final class VideoOptimizeModel: ObservableObject {
     @Published var items: [VideoQueueItem] = []
-    @Published var selectedItemID: UUID?
+    @Published var selectedItemID: UUID? {
+        didSet {
+            guard !selectionMutationInProgress else { return }
+            selectedItemIDs = selectedItemID.map { [$0] } ?? []
+            selectionAnchorID = selectedItemID
+        }
+    }
+    @Published private(set) var selectedItemIDs: Set<UUID> = []
     @Published var settings = VideoOptimizeSettings()
     @Published var previewSeconds = 0.0
+    @Published var player: AVPlayer?
+    @Published var isPlaying = false
+    @Published var isMuted = false
     @Published var isProcessing = false
     @Published var statusMessage: String?
+    /// A lightweight identity for the derived estimate card. Settings are a
+    /// value type, so changing any nested control can replace the card without
+    /// disturbing the rest of the preview or queue.
+    @Published private(set) var estimateRevision = 0
 
     private var processingTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
+    private var playerTimeObserver: Any?
+    private var playerEndObserver: NSObjectProtocol?
+    private var resumesAfterScrubbing = false
+    private var selectionAnchorID: UUID?
+    private var selectionMutationInProgress = false
 
     var selectedItem: VideoQueueItem? {
-        guard let selectedItemID else { return items.first }
+        guard let selectedItemID else { return nil }
         return items.first { $0.id == selectedItemID }
     }
     var completedCount: Int { items.filter(\.isSaveReady).count }
+
+    var selectedIDs: Set<UUID> {
+        let validIDs = Set(items.map(\.id))
+        let current = selectedItemIDs.intersection(validIDs)
+        if !current.isEmpty { return current }
+        if let selectedItemID, validIDs.contains(selectedItemID) { return [selectedItemID] }
+        return []
+    }
+
+    var selectedItems: [VideoQueueItem] {
+        let ids = selectedIDs
+        return items.filter { ids.contains($0.id) }
+    }
+
+    var selectedItemCount: Int { selectedIDs.count }
+    var selectedSaveItems: [VideoQueueItem] { selectedItems.filter(\.isSaveReady) }
+    var selectedSaveCount: Int { selectedSaveItems.count }
+    func isSelected(_ item: VideoQueueItem) -> Bool { selectedIDs.contains(item.id) }
+
+    private func setSelection(_ ids: Set<UUID>, primary: UUID?) {
+        selectionMutationInProgress = true
+        selectedItemIDs = ids
+        selectedItemID = primary
+        selectionMutationInProgress = false
+        selectionAnchorID = primary
+    }
 
     var selectedPlan: VideoEncodingPlan? {
         guard let descriptor = selectedItem?.descriptor,
@@ -28,6 +74,10 @@ final class VideoOptimizeModel: ObservableObject {
         return try? VideoSizeTargetPolicy.plan(sourceSize: CGSize(width: width, height: height),
             sourceFrameRate: max(1, descriptor.frameRate ?? 30),
             sourceDuration: CMTimeGetSeconds(duration), settings: settings)
+    }
+
+    func refreshEstimate() {
+        estimateRevision &+= 1
     }
 
     func chooseFiles() {
@@ -52,21 +102,48 @@ final class VideoOptimizeModel: ObservableObject {
             .map(VideoQueueItem.init(sourceURL:))
         guard !newItems.isEmpty else { statusMessage = "Those videos are already queued."; return }
         items.append(contentsOf: newItems)
-        if selectedItemID == nil { selectedItemID = newItems.first?.id }
+        if selectedItemID == nil, let first = newItems.first { select(first) }
         analyse(ids: Set(newItems.map(\.id)))
     }
 
     func select(_ item: VideoQueueItem) {
-        selectedItemID = item.id
-        previewSeconds = max(settings.trimStartSeconds, 0)
+        select(item, modifiers: [])
+    }
+
+    func select(_ item: VideoQueueItem, modifiers: NSEvent.ModifierFlags) {
+        let orderedIDs = items.map(\.id)
+        let result = MediaSelection.update(current: selectedIDs,
+                                           anchorID: selectionAnchorID,
+                                           tappedID: item.id,
+                                           orderedIDs: orderedIDs,
+                                           modifiers: modifiers)
+        setSelection(result.ids,
+                     primary: MediaSelection.primaryID(for: result.ids,
+                                                       preferredID: item.id,
+                                                       orderedIDs: orderedIDs))
+        selectionAnchorID = result.anchorID
+        if let selected = selectedItem {
+            previewSeconds = max(settings.trimStartSeconds, 0)
+            configurePlayer(for: selected.sourceURL)
+            seekPreview()
+        } else {
+            previewSeconds = 0
+            resetPlayer()
+        }
     }
 
     func refreshPreview() {
+        if player != nil {
+            seekPreview()
+            return
+        }
         guard let item = selectedItem else { return }
         previewTask?.cancel()
         let time = previewSeconds
         previewTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 140_000_000)
+            // Keep marker dragging responsive without starting an image
+            // generator task for every pointer event.
+            try? await Task.sleep(nanoseconds: 60_000_000)
             guard !Task.isCancelled, let self else { return }
             let poster = await VideoPosterGenerator.image(for: item.sourceURL, at: time)
             guard !Task.isCancelled,
@@ -75,13 +152,114 @@ final class VideoOptimizeModel: ObservableObject {
         }
     }
 
+    func togglePlayback() {
+        guard let player else { return }
+        if isPlaying {
+            player.pause()
+            isPlaying = false
+            return
+        }
+
+        if let duration = sourceDuration, previewSeconds >= duration - 0.05 {
+            previewSeconds = max(0, settings.trimStartSeconds)
+            seekPreview()
+        }
+        player.play()
+        isPlaying = true
+    }
+
+    func skipPreview(by seconds: Double) {
+        setPreviewPosition(previewSeconds + seconds)
+    }
+
+    func setPreviewPosition(_ seconds: Double) {
+        previewSeconds = clampedPreviewSeconds(seconds)
+        seekPreview()
+    }
+
+    func previewScrubbingChanged(_ isScrubbing: Bool) {
+        guard let player else { return }
+        if isScrubbing {
+            resumesAfterScrubbing = isPlaying
+            player.pause()
+            isPlaying = false
+        } else {
+            seekPreview()
+            if resumesAfterScrubbing {
+                player.play()
+                isPlaying = true
+            }
+            resumesAfterScrubbing = false
+        }
+    }
+
+    func toggleMute() {
+        isMuted.toggle()
+        player?.isMuted = isMuted
+    }
+
+    func seekPreview() {
+        guard let player else { return }
+        previewSeconds = clampedPreviewSeconds(previewSeconds)
+        player.seek(to: CMTime(seconds: previewSeconds, preferredTimescale: 600),
+                    toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
     func applyAll() {
-        let ready = items.filter { $0.descriptor != nil && $0.stage != .analysing }
-        guard !ready.isEmpty, !isProcessing else { return }
+        apply(itemIDs: Set(items.map(\.id)))
+    }
+
+    var canApplyAll: Bool {
+        !isProcessing && items.contains { $0.descriptor != nil && $0.stage != .analysing }
+    }
+
+    var canApplySelected: Bool {
+        canApplyAll && selectedItems.contains {
+            $0.descriptor != nil && $0.stage != .analysing
+        }
+    }
+
+    func applySelected() {
+        guard canApplySelected else { return }
+        apply(itemIDs: selectedIDs)
+    }
+
+    var canSaveSelected: Bool {
+        !isProcessing && !selectedSaveItems.isEmpty
+    }
+
+    func saveSelected() {
+        let pending = selectedSaveItems
+        guard canSaveSelected else { return }
+        if selectedItemCount == 1, let item = pending.first {
+            save(item: item)
+            return
+        }
+        guard let folder = BatchSaveFolderChooser.choose(
+            defaultDirectory: AppSettings.shared.defaultSaveDirectory,
+            message: "Choose a folder for \(pending.count) selected video\(pending.count == 1 ? "" : "s")") else { return }
+        var saved = 0
+        for item in pending {
+            guard let outputURL = item.outputURL else { continue }
+            let filename = item.suggestedFilename(suffix: "optimized",
+                                                  extension: outputURL.pathExtension)
+            let destination = MediaSaveService.uniqueURL(in: folder, filename: filename)
+            if write(itemID: item.id, outputURL: outputURL, destination: destination) { saved += 1 }
+        }
+        statusMessage = "Saved \(saved) selected optimized video\(saved == 1 ? "" : "s") to \(folder.lastPathComponent)."
+    }
+
+    private func apply(itemIDs: Set<UUID>) {
+        let ready = items.filter {
+            itemIDs.contains($0.id) && $0.descriptor != nil && $0.stage != .analysing
+        }
+        guard !ready.isEmpty, !isProcessing, processingTask == nil else { return }
         let snapshot = settings
+        isProcessing = true
         processingTask = Task { [weak self] in
             guard let self else { return }
-            self.isProcessing = true
+            self.player?.pause()
+            self.isPlaying = false
             var completed = 0
             for queued in ready {
                 if Task.isCancelled { break }
@@ -147,14 +325,33 @@ final class VideoOptimizeModel: ObservableObject {
 
     func clear() {
         processingTask?.cancel(); previewTask?.cancel()
+        resetPlayer()
         items.forEach { cleanup($0.outputURL) }
-        items.removeAll(); selectedItemID = nil; statusMessage = nil; isProcessing = false
+        items.removeAll(); setSelection([], primary: nil); previewSeconds = 0
+        statusMessage = nil; isProcessing = false
     }
 
     func remove(item: VideoQueueItem) {
         cleanup(item.outputURL)
         items.removeAll { $0.id == item.id }
-        if selectedItemID == item.id { selectedItemID = items.first?.id }
+        let retained = selectedIDs.subtracting([item.id]).intersection(Set(items.map(\.id)))
+        if retained.isEmpty {
+            let next = items.first?.id
+            setSelection(next.map { [$0] } ?? [], primary: next)
+        } else {
+            setSelection(retained,
+                         primary: MediaSelection.primaryID(for: retained,
+                                                           preferredID: selectedItemID,
+                                                           orderedIDs: items.map(\.id)))
+        }
+        if let primary = selectedItem, primary.id != item.id {
+            previewSeconds = max(settings.trimStartSeconds, 0)
+            configurePlayer(for: primary.sourceURL)
+            seekPreview()
+        } else if selectedItem == nil {
+            previewSeconds = 0
+            resetPlayer()
+        }
     }
 
     func save(item: VideoQueueItem) {
@@ -207,8 +404,64 @@ final class VideoOptimizeModel: ObservableObject {
                     }
                 }
             }
-            self.statusMessage = "Choose settings, preview the frame, then Apply to All."
+            self.statusMessage = "Choose settings, then Optimize Selected or Optimize All. Save prepared outputs separately."
         }
+    }
+
+    private var sourceDuration: Double? {
+        guard let duration = selectedItem?.descriptor?.duration else { return nil }
+        let seconds = CMTimeGetSeconds(duration)
+        return seconds.isFinite && seconds > 0 ? seconds : nil
+    }
+
+    private func clampedPreviewSeconds(_ seconds: Double) -> Double {
+        guard seconds.isFinite else { return 0 }
+        return min(max(0, seconds), sourceDuration ?? max(0, seconds))
+    }
+
+    private func configurePlayer(for sourceURL: URL) {
+        resetPlayer()
+        let player = AVPlayer(url: sourceURL)
+        player.isMuted = isMuted
+        self.player = player
+
+        playerTimeObserver = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.1, preferredTimescale: 600),
+            queue: .main
+        ) { [weak self, weak player] time in
+            guard let self, let player else { return }
+            MainActor.assumeIsolated {
+                let seconds = CMTimeGetSeconds(time)
+                if seconds.isFinite { self.previewSeconds = self.clampedPreviewSeconds(seconds) }
+                self.isPlaying = player.rate != 0
+            }
+        }
+
+        playerEndObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: player.currentItem,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                self.isPlaying = false
+            }
+        }
+    }
+
+    private func resetPlayer() {
+        player?.pause()
+        if let playerTimeObserver, let player {
+            player.removeTimeObserver(playerTimeObserver)
+        }
+        if let playerEndObserver {
+            NotificationCenter.default.removeObserver(playerEndObserver)
+        }
+        playerTimeObserver = nil
+        playerEndObserver = nil
+        player = nil
+        isPlaying = false
+        resumesAfterScrubbing = false
     }
 
     @discardableResult

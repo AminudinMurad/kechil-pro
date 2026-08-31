@@ -1,7 +1,6 @@
 import Foundation
 import ImageIO
 import Security
-import Compression
 
 // MARK: - Public report model
 
@@ -135,7 +134,9 @@ enum ProvenanceProbe {
             case 0xE1:
                 let signature = ascii(bytes, payloadStart, min(40, end - payloadStart))
                 if signature.hasPrefix("Exif") {
-                    builder.addCarrier("JPEG APP1 (EXIF)")
+                    if !ImageRenderingMetadata.isOrientationOnlyEXIF(payload) {
+                        builder.addCarrier("JPEG APP1 (EXIF)")
+                    }
                 } else if signature.contains("ns.adobe.com/xap") ||
                             signature.contains("<?xpacket") || signature.contains("<x:xmpmeta") {
                     builder.addCarrier("JPEG APP1 (XMP)")
@@ -206,6 +207,7 @@ enum ProvenanceProbe {
 
     private static func inspectPNG(_ bytes: [UInt8], builder: inout ReportBuilder) {
         var i = 8
+        var textBudget = PNGTextMetadata.maximumImageTextBytes
         while i + 12 <= bytes.count {
             guard let size32 = readBE32(bytes, i) else { break }
             let size = Int(size32)
@@ -214,35 +216,24 @@ enum ProvenanceProbe {
             let payload = Data(bytes[(i + 8)..<(i + 8 + size)])
 
             switch type {
-            case "tEXt":
-                let (key, value) = splitNull(payload)
-                builder.addCarrier("PNG tEXt: \(key.isEmpty ? "unnamed" : key)")
-                analyzeText(key: key, value: utf8(value), protocolName: "PNG tEXt",
-                            confidence: .inferred, builder: &builder)
-            case "zTXt":
-                let (key, tail) = splitNull(payload)
-                builder.addCarrier("PNG zTXt: \(key.isEmpty ? "unnamed" : key)")
-                if tail.count > 1, let decoded = inflateZlib(Data(tail.dropFirst())) {
-                    analyzeText(key: key, value: utf8(decoded), protocolName: "PNG zTXt",
-                                confidence: .inferred, builder: &builder)
-                } else {
-                    builder.addLimitation("A compressed PNG text field could not be decoded.")
-                }
-            case "iTXt":
-                let parsed = parseITXt(payload)
-                builder.addCarrier("PNG iTXt: \(parsed.key.isEmpty ? "unnamed" : parsed.key)")
-                if let text = parsed.text {
-                    if parsed.key.lowercased().contains("xml") || text.contains("<x:xmpmeta") ||
-                        text.contains("<?xpacket") {
-                        inspectXMP(Data(text.utf8), protocolName: "XMP in PNG iTXt",
+            case "tEXt", "zTXt", "iTXt":
+                do {
+                    let field = try PNGTextMetadata.decode(type: type, payload: payload, remainingBytes: &textBudget)
+                    builder.addCarrier("PNG \(type): \(field.key)")
+                    if field.key.lowercased().contains("xml") || field.text.contains("<x:xmpmeta") ||
+                        field.text.contains("<?xpacket") {
+                        inspectXMP(Data(field.text.utf8), protocolName: "XMP in PNG \(type)",
                                    builder: &builder)
                     }
-                    analyzeText(key: parsed.key, value: text, protocolName: "PNG iTXt",
+                    analyzeText(key: field.key, value: field.text, protocolName: "PNG \(type)",
                                 confidence: .inferred, builder: &builder)
-                } else {
-                    builder.addLimitation("A compressed PNG international text field could not be decoded.")
+                } catch {
+                    builder.addCarrier("PNG \(type): undecoded text")
+                    builder.addLimitation(error.localizedDescription)
+                    builder.coverage = .partial
                 }
-            case "eXIf": builder.addCarrier("PNG eXIf")
+            case "eXIf":
+                if !ImageRenderingMetadata.isOrientationOnlyEXIF(payload) { builder.addCarrier("PNG eXIf") }
             case "tIME": builder.addCarrier("PNG tIME timestamp")
             case "caBX":
                 builder.addCarrier("PNG caBX (C2PA / JUMBF)")
@@ -267,7 +258,8 @@ enum ProvenanceProbe {
             let fourCC = ascii(bytes, i, 4)
             let payload = Data(bytes[(i + 8)..<(i + 8 + size)])
             switch fourCC {
-            case "EXIF": builder.addCarrier("WebP EXIF")
+            case "EXIF":
+                if !ImageRenderingMetadata.isOrientationOnlyEXIF(payload) { builder.addCarrier("WebP EXIF") }
             case "XMP ":
                 builder.addCarrier("WebP XMP")
                 inspectXMP(payload, protocolName: "XMP in WebP", builder: &builder)
@@ -440,7 +432,9 @@ enum ProvenanceProbe {
                                confidence: confidence)
         }
 
-        let generator = knownGenerator(in: joined)
+        let generator = MetadataTextClassifier.isGeneratorField(key: key, value: value)
+            ? MetadataTextClassifier.knownGenerator(in: value)
+            : nil
         if let generator {
             builder.addFinding(kind: .generator, title: generator,
                                detail: "Named by \(key)", protocolName: protocolName,
@@ -451,8 +445,7 @@ enum ProvenanceProbe {
         }
 
         let lowerKey = key.lowercased()
-        if lowerKey.contains("parameters"),
-           joined.contains("steps:") || joined.contains("sampler:") || joined.contains("cfg scale:") {
+        if MetadataTextClassifier.isGenerationParameters(key: key, value: value) {
             builder.addFinding(kind: .generator, title: "Stable Diffusion / AUTOMATIC1111-style parameters",
                                detail: "Generator-specific parameter block", protocolName: protocolName,
                                confidence: .inferred)
@@ -460,8 +453,7 @@ enum ProvenanceProbe {
                                detail: shortened(trimmed), protocolName: protocolName,
                                confidence: .inferred)
         }
-        if lowerKey == "workflow" || lowerKey.hasSuffix(":workflow") ||
-            (lowerKey == "prompt" && (joined.contains("class_type") || joined.contains("ksampler"))) {
+        if MetadataTextClassifier.isComfyWorkflow(key: key, value: value) {
             builder.addFinding(kind: .generator, title: "ComfyUI workflow",
                                detail: "Embedded node graph", protocolName: protocolName,
                                confidence: .inferred)
@@ -521,29 +513,6 @@ enum ProvenanceProbe {
                                confidence: confidence)
             builder.addStillPresent("A declared in-pixel watermark or fingerprint may remain after metadata removal.")
         }
-    }
-
-    private static func knownGenerator(in text: String) -> String? {
-        let generators: [(String, String)] = [
-            ("automatic1111", "AUTOMATIC1111 / Stable Diffusion"),
-            ("stable diffusion", "Stable Diffusion"),
-            ("comfyui", "ComfyUI"),
-            ("invokeai", "InvokeAI"),
-            ("novelai", "NovelAI"),
-            ("midjourney", "Midjourney"),
-            ("adobe firefly", "Adobe Firefly"),
-            ("firefly", "Adobe Firefly"),
-            ("dall-e", "OpenAI DALL-E"),
-            ("dall·e", "OpenAI DALL-E"),
-            ("gpt-image", "OpenAI image generation"),
-            ("openai image", "OpenAI image generation"),
-            ("ideogram", "Ideogram"),
-            ("leonardo.ai", "Leonardo AI"),
-            ("leonardo ai", "Leonardo AI"),
-            ("flux.1", "FLUX"),
-            ("black forest labs", "FLUX / Black Forest Labs"),
-        ]
-        return generators.first(where: { text.contains($0.0) })?.1
     }
 
     // MARK: C2PA / JUMBF / CBOR
@@ -712,7 +681,7 @@ enum ProvenanceProbe {
             let lower = string.lowercased()
             guard lower.contains("trainedalgorithmic") || lower.contains("compositesynthetic") ||
                     lower.contains("compositewithtrained") || lower.contains("c2pa.") ||
-                    lower.contains("creator tool") || knownGenerator(in: lower) != nil else { continue }
+                    lower.contains("creator tool") || MetadataTextClassifier.knownGenerator(in: lower) != nil else { continue }
             analyzeText(key: "embedded string", value: string, protocolName: protocolName,
                         confidence: .inferred, builder: &builder)
         }
@@ -751,53 +720,6 @@ enum ProvenanceProbe {
 
     private static func utf8(_ data: Data) -> String {
         String(decoding: data, as: UTF8.self).trimmingCharacters(in: CharacterSet(charactersIn: "\0"))
-    }
-
-    private static func splitNull(_ data: Data) -> (String, Data) {
-        guard let zero = data.firstIndex(of: 0) else { return (utf8(data), Data()) }
-        return (utf8(data[..<zero]), Data(data[data.index(after: zero)...]))
-    }
-
-    private static func parseITXt(_ data: Data) -> (key: String, text: String?) {
-        let bytes = [UInt8](data)
-        guard let keyEnd = bytes.firstIndex(of: 0), keyEnd + 2 < bytes.count else {
-            return ("", utf8(data))
-        }
-        let key = String(decoding: bytes[..<keyEnd], as: UTF8.self)
-        let compressed = bytes[keyEnd + 1] == 1
-        var cursor = keyEnd + 3
-        for _ in 0..<2 {
-            guard cursor <= bytes.count,
-                  let end = bytes[cursor...].firstIndex(of: 0) else { return (key, nil) }
-            cursor = end + 1
-        }
-        guard cursor <= bytes.count else { return (key, nil) }
-        let payload = Data(bytes[cursor...])
-        if compressed { return (key, inflateZlib(payload).map(utf8)) }
-        return (key, utf8(payload))
-    }
-
-    /// Uses Foundation's zlib decoder through NSData's compression API when available.
-    /// PNG caps decompressed text here so hostile files cannot expand without bound.
-    private static func inflateZlib(_ data: Data) -> Data? {
-        guard !data.isEmpty else { return Data() }
-        // `NSData.decompressed(using:)` is unavailable on the macOS 13 deployment
-        // target. `compression_decode_buffer` is in libcompression, which Swift can
-        // call without another dependency.
-        let algorithm = COMPRESSION_ZLIB
-        var capacity = max(4096, data.count * 4)
-        let ceiling = 16 * 1024 * 1024
-        while capacity <= ceiling {
-            var output = [UInt8](repeating: 0, count: capacity)
-            let decoded = data.withUnsafeBytes { source in
-                compression_decode_buffer(&output, output.count,
-                                          source.bindMemory(to: UInt8.self).baseAddress!,
-                                          data.count, nil, algorithm)
-            }
-            if decoded > 0 { return Data(output.prefix(decoded)) }
-            capacity *= 2
-        }
-        return nil
     }
 
     private static func printableStrings(_ bytes: [UInt8], minimumLength: Int) -> [String] {

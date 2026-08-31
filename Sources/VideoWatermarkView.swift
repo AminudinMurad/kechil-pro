@@ -1,5 +1,4 @@
 import AppKit
-import AVKit
 import CoreMedia
 import SwiftUI
 
@@ -35,9 +34,26 @@ struct VideoWatermarkView: View {
         .onChange(of: model.tileGapPercent) { _ in model.refreshPreviewOverlay() }
         .onChange(of: model.shadowEnabled) { _ in model.refreshPreviewOverlay() }
         .onChange(of: model.shadowOpacity) { _ in model.refreshPreviewOverlay() }
+        .onChange(of: model.selectedItemID) { _ in model.refreshSizeEstimate() }
+        .onChange(of: model.sizeEstimateSettingsKey) { _ in
+            model.refreshSizeEstimate()
+        }
     }
 
     private var controls: some View {
+        VStack(spacing: 0) {
+            settingsControls
+            Divider()
+            ToolApplyActions(operation: "Watermark", canProcessAll: model.canApply,
+                             canProcessSelected: model.canApplySelected,
+                             processAll: model.applyAll, processSelected: model.applySelected,
+                             selectedCount: model.selectedItemCount)
+                .padding(14)
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private var settingsControls: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 13) {
                 Label("Watermark settings", systemImage: "slider.horizontal.3")
@@ -112,12 +128,6 @@ struct VideoWatermarkView: View {
                         .font(.system(size: 9.5)).foregroundStyle(.secondary)
                 }
 
-                Button(action: model.applyAll) {
-                    Label("Apply to All Videos", systemImage: "seal.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!model.canApply)
             }
             .padding(14)
         }
@@ -134,8 +144,8 @@ struct VideoWatermarkView: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(model.items) { item in
-                        VideoWatermarkRow(item: item, selected: model.selectedItemID == item.id,
-                            select: { model.select(item) }, save: { model.save(item: item) },
+                        VideoWatermarkRow(item: item, selected: model.isSelected(item),
+                            select: { model.select(item, modifiers: NSEvent.modifierFlags) }, save: { model.save(item: item) },
                             remove: { model.remove(item: item) })
                     }
                 }
@@ -172,7 +182,9 @@ struct VideoWatermarkView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10).fill(Color.black)
                     if let player = model.player {
-                        VideoPlayer(player: player).clipShape(RoundedRectangle(cornerRadius: 9))
+                        VideoPreviewSurface(player: player)
+                            .clipShape(RoundedRectangle(cornerRadius: 9))
+                            .allowsHitTesting(false)
                     } else if let poster = model.selectedItem?.poster {
                         Image(nsImage: poster).resizable().aspectRatio(contentMode: .fit)
                     }
@@ -208,6 +220,14 @@ struct VideoWatermarkView: View {
                       systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: 9.5)).foregroundStyle(.orange)
             }
+            MediaSizeEstimateCard(
+                title: "Watermarked output estimate",
+                estimate: model.sizeEstimateItemID == model.selectedItem?.id
+                    ? model.sizeEstimate : nil,
+                isEstimating: model.sizeEstimateItemID == model.selectedItem?.id &&
+                    model.isEstimatingSize,
+                error: model.sizeEstimateItemID == model.selectedItem?.id
+                    ? model.sizeEstimateError : nil)
         }
         .padding(12)
     }
@@ -222,19 +242,25 @@ struct VideoWatermarkView: View {
                    onEditingChanged: { editing in if !editing { model.seekPreview() } })
             Text(Self.duration(duration)).monospacedDigit()
         }
-        .font(.system(size: 9.5)).foregroundStyle(.secondary)
+        .foregroundStyle(.secondary)
+        .controlSize(.regular)
+        .font(.system(size: 11, design: .monospaced))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .frame(minHeight: 34)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
     }
 
     private var queueHeader: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Video queue").font(.system(size: 12.5, weight: .semibold))
-                Text("\(model.items.count) queued · \(model.completedCount) ready to save")
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 12).padding(.vertical, 9)
+        BatchOutputHeader(title: "Video queue", queuedCount: model.items.count,
+                          readyCount: model.completedCount, isProcessing: model.isProcessing,
+                          save: model.saveAll, selectedName: model.selectedItemID == nil ? nil : model.selectedItem?.displayName,
+                          selectedCount: model.selectedItemCount,
+                          selectedReadyCount: model.selectedSaveCount,
+                          canSaveSelected: model.canSaveSelected, saveSelected: model.saveSelected)
     }
 
     private var sourceDuration: Double? {
@@ -311,10 +337,17 @@ private struct VideoWatermarkRow: View {
                 } else if let output = item.outputDescriptor {
                     Text("\(output.displayWidth ?? 0) × \(output.displayHeight ?? 0) · \(output.videoCodec ?? "Video")")
                         .font(.system(size: 9)).foregroundStyle(.tertiary)
+                } else if let descriptor = item.descriptor {
+                    Text("Original: \(descriptor.displayWidth ?? 0) × \(descriptor.displayHeight ?? 0) · \(descriptor.videoCodec ?? "Video")")
+                        .font(.system(size: 9)).foregroundStyle(.tertiary)
                 }
             }
             Spacer(minLength: 4)
-            if item.isSaveReady { Button("Save…", action: save).controlSize(.small) }
+            if item.isSaveReady {
+                Button("Save…", action: save)
+                    .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+                    .controlSize(.regular)
+            }
             Button(action: remove) { Image(systemName: "xmark") }
                 .buttonStyle(.borderless).foregroundStyle(.tertiary).help("Remove video")
         }

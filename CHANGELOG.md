@@ -3,7 +3,7 @@
 All notable changes to Kechil PRO are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.0.0] — 2026-08-31
 
 ### Changed
 - The app is now a three-tool local-processing media utility: Clean, Optimize and Watermark.
@@ -42,6 +42,18 @@ This project follows [Semantic Versioning](https://semver.org/).
   Switching a choice re-runs the current queue from the original files, keeps unrelated
   metadata where the container supports it, and re-reads the output to report any
   selected-scope data that remains. Video Clean retains its five multi-select groups.
+- Clean and Watermark now show a live selected-media size card when settings change.
+  Clean measures the same cleaner or unchanged-copy path, Image Watermark fully encodes
+  the current image settings, and Video Watermark encodes a real short sample before
+  projecting it across the duration. The card replaces the estimate with the prepared
+  output's measured bytes after export.
+- Media queues now support standard macOS multi-selection: Command-click toggles rows
+  and Shift-click selects a range, while the last clicked row remains the preview
+  primary. Clean, Optimize and Watermark Selected operate on the selected set. Save
+  Selected saves all selected prepared outputs into one chosen folder as separate,
+  collision-safe files, and Save/Save Selected/Save All use one shared green action
+  style and width. Optimize rows show the newly selected source's original dimensions
+  until its current preview/output exists.
 - The workspace toolbar and empty routes now include **Paste URL**. They accept a
   direct HTTP(S) image/video URL, a Finder `file://` URL or an absolute local path.
   Remote sources are downloaded into Kechil's sandboxed temporary folder before

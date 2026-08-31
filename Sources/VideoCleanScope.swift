@@ -25,15 +25,15 @@ enum VideoCleanScope: String, CaseIterable, Identifiable, Hashable, Sendable {
     var detail: String {
         switch self {
         case .contentCredentials:
-            return "C2PA manifest and known provenance UUID boxes"
+            return "C2PA & provenance"
         case .descriptiveMetadata:
-            return "Title, author, comments and application metadata"
+            return "Title, author & comments"
         case .xmp:
-            return "Adobe XMP packets stored in known MP4 boxes"
+            return "Adobe XMP"
         case .location:
-            return "Known location metadata stored in user-data boxes"
+            return "GPS & ISO 6709"
         case .containerDates:
-            return "Non-empty creation and modification timestamps"
+            return "Created & modified"
         }
     }
 
@@ -107,6 +107,9 @@ struct VideoCleanSelection: OptionSet, Hashable, Sendable {
 
     func matches(_ finding: VideoMetadataFinding) -> Bool {
         guard finding.removable, !isEmpty else { return false }
+        // The all-groups export removes all exposed metadata. Verification must
+        // also include device/artwork/timed/unknown fields, not just five labels.
+        if self == .all { return true }
         return scopes.contains { scope in
             let identifiers = [finding.identifier, finding.displayName]
                 .joined(separator: " ").lowercased()
@@ -154,9 +157,9 @@ struct VideoCleanSelection: OptionSet, Hashable, Sendable {
     }
 
     func noMatchMessage() -> String {
-        if isEmpty { return "Select at least one metadata group to clean this video." }
-        if self == .all { return "No supported metadata was found in this video." }
-        return "No selected metadata was found in this video."
+        if isEmpty { return "No groups selected. An unchanged copy is ready to save." }
+        if self == .all { return "No supported metadata was detected. An unchanged copy is ready to save." }
+        return "No selected supported metadata was detected. An unchanged copy is ready to save."
     }
 
     private static func option(for scope: VideoCleanScope) -> VideoCleanSelection {
@@ -185,5 +188,140 @@ extension CleanPreset {
         case .exif: return []
         case .gps: return .location
         }
+    }
+}
+
+/// Presentation decisions shared by the inspector and safety checks. A metadata
+/// carrier is not evidence of AI creation, and a still-present field is never
+/// listed as removed just because its value or track index changed.
+enum VideoCleanEvidence {
+    static func noLongerDetected(_ input: [VideoMetadataFinding],
+                                remaining: [VideoMetadataFinding]) -> [VideoMetadataFinding] {
+        let remainingKeys = Set(remaining.map {
+            "\($0.scope.label)|\($0.identifier.lowercased())"
+        })
+        return input.filter {
+            !remainingKeys.contains("\($0.scope.label)|\($0.identifier.lowercased())")
+        }
+    }
+
+    static func isProvenance(_ finding: VideoMetadataFinding) -> Bool {
+        if finding.category == .provenance { return true }
+        let key = "\(finding.identifier) \(finding.displayName)".lowercased()
+        return ["c2pa", "content credential", "provenance", "jumbf"].contains(where: key.contains)
+    }
+
+    static func declaresAISource(_ finding: VideoMetadataFinding) -> Bool {
+        let key = "\(finding.identifier) \(finding.displayName)".lowercased()
+        let sourceField = ["generator", "software", "digital source", "digitalsourcetype", "xmp"]
+            .contains(where: key.contains)
+        guard isProvenance(finding) || sourceField else { return false }
+        let value = ([finding.valueSummary] + finding.evidence
+            .filter { $0.label != "Identifier" && $0.label != "Common key" }
+            .map(\.value)).joined(separator: " ").lowercased()
+        return ["trainedalgorithmicmedia", "compositewithtrainedalgorithmicmedia",
+                "generative ai", "ai-generated", "ai generated", "ai_generation",
+                "gpt-image", "dall-e", "stable diffusion", "midjourney", "comfyui",
+                "automatic1111", "adobe firefly", "openai sora", "openai (sora)"]
+            .contains(where: value.contains)
+    }
+}
+
+/// Presentation-only categories for the Video Clean batch findings and queue
+/// filters. They deliberately describe the inspected original rather than the
+/// five independent removal scopes.
+enum VideoFindingFilter: String, CaseIterable, Identifiable, Hashable, Sendable {
+    case generativeAI
+    case contentCredentials
+    case xmp
+    case location
+    case descriptiveMetadata
+    case deviceSoftware
+    case datesTimestamps
+    case artwork
+    case timedMetadata
+    case technical
+    case otherMetadata
+
+    enum Tone { case neutral, critical, serious }
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .generativeAI: return "Generative AI"
+        case .contentCredentials: return "Content Credentials"
+        case .xmp: return "XMP"
+        case .location: return "Location"
+        case .descriptiveMetadata: return "Descriptive metadata"
+        case .deviceSoftware: return "Device and software"
+        case .datesTimestamps: return "Dates and timestamps"
+        case .artwork: return "Artwork"
+        case .timedMetadata: return "Timed metadata"
+        case .technical: return "Technical"
+        case .otherMetadata: return "Other metadata"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .generativeAI: return "sparkles"
+        case .contentCredentials: return "seal.fill"
+        case .xmp: return "doc.text.fill"
+        case .location: return "location.fill"
+        case .descriptiveMetadata: return "text.alignleft"
+        case .deviceSoftware: return "camera.fill"
+        case .datesTimestamps: return "calendar"
+        case .artwork: return "photo.fill"
+        case .timedMetadata: return "timeline.selection"
+        case .technical: return "wrench.and.screwdriver.fill"
+        case .otherMetadata: return "tag.fill"
+        }
+    }
+
+    var tone: Tone {
+        switch self {
+        case .location: return .critical
+        case .generativeAI, .contentCredentials: return .serious
+        default: return .neutral
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .generativeAI:
+            return "An explicit source declaration or recognised generator identifies Generative AI."
+        case .contentCredentials:
+            return "C2PA or other provenance metadata; this alone is not proof of AI generation."
+        case .xmp: return "Readable Adobe XMP metadata exposed by the video inspection."
+        case .location: return "GPS or ISO 6709 location metadata."
+        case .descriptiveMetadata: return "Titles, descriptions, authors or comments."
+        case .deviceSoftware: return "Camera, device, encoder or software identifiers."
+        case .datesTimestamps: return "Creation, modification or container timestamps."
+        case .artwork: return "Embedded artwork, covers or thumbnails."
+        case .timedMetadata: return "Metadata carried on a timed track."
+        case .technical: return "Technical media facts that Clean does not claim to remove."
+        case .otherMetadata: return "Other inspected metadata not covered by a named category."
+        }
+    }
+
+    func matches(_ finding: VideoMetadataFinding) -> Bool {
+        switch self {
+        case .generativeAI: return VideoCleanEvidence.declaresAISource(finding)
+        case .contentCredentials: return VideoCleanEvidence.isProvenance(finding)
+        case .xmp: return VideoCleanSelection.xmp.matches(finding)
+        case .location: return finding.category == .location
+        case .descriptiveMetadata: return finding.category == .descriptive
+        case .deviceSoftware: return finding.category == .device
+        case .datesTimestamps: return finding.category == .timestamp
+        case .artwork: return finding.category == .artwork
+        case .timedMetadata: return finding.category == .timed
+        case .technical: return finding.category == .technical
+        case .otherMetadata: return finding.category == .unknown
+        }
+    }
+
+    static func filters(in findings: [VideoMetadataFinding]) -> [VideoFindingFilter] {
+        allCases.filter { filter in findings.contains(where: filter.matches) }
     }
 }

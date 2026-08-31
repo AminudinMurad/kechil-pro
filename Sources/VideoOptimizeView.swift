@@ -1,3 +1,4 @@
+import AppKit
 import CoreMedia
 import SwiftUI
 
@@ -13,34 +14,42 @@ struct VideoOptimizeView: View {
                                 pasteURL: { model.add(urls: [$0]) })
             } else {
                 HSplitView {
-                    controls.frame(minWidth: 260, idealWidth: 280, maxWidth: 310)
-                    workspace.frame(minWidth: 450)
+                    controls.frame(minWidth: OptimizeWorkspaceLayout.settingsMinimumWidth,
+                                   idealWidth: OptimizeWorkspaceLayout.settingsIdealWidth,
+                                   maxWidth: OptimizeWorkspaceLayout.settingsMaximumWidth)
+                    workspace.frame(minWidth: OptimizeWorkspaceLayout.outputMinimumWidth)
                 }
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        // The estimate is derived from the complete settings value. Explicitly
+        // invalidate its card when any setting changes so target-size edits made
+        // through the text field or its stepper are reflected immediately.
+        .onChange(of: model.settings) { _ in
+            model.refreshEstimate()
+        }
     }
 
     private var controls: some View {
+        VStack(spacing: 0) {
+            settingsControls
+            Divider()
+            ToolApplyActions(operation: "Optimize", canProcessAll: model.canApplyAll,
+                             canProcessSelected: model.canApplySelected,
+                             processAll: model.applyAll, processSelected: model.applySelected,
+                             selectedCount: model.selectedItemCount)
+                .padding(14)
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private var settingsControls: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 13) {
                 Label("Video settings", systemImage: "slider.horizontal.3")
                     .font(.system(size: 15, weight: .semibold))
-                Text("The preview shows the selected crop and frame. Export always creates a new file.")
+                Text("Trim directly below the preview. Crop, resize and export always create a new file.")
                     .font(.system(size: 10.5)).foregroundStyle(.secondary)
-
-                section("TRIM") {
-                    if let duration = sourceDuration {
-                        VideoTrimRangeControl(duration: duration,
-                                              startSeconds: $model.settings.trimStartSeconds,
-                                              endSeconds: $model.settings.trimEndSeconds,
-                                              playheadSeconds: $model.previewSeconds,
-                                              refreshPreview: model.refreshPreview)
-                    } else {
-                        Label("Reading the source duration…", systemImage: "clock")
-                            .font(.system(size: 10)).foregroundStyle(.secondary)
-                    }
-                }
 
                 section("CROP") {
                     Picker("Aspect", selection: $model.settings.cropPreset) {
@@ -102,12 +111,6 @@ struct VideoOptimizeView: View {
 
                 estimateCard
 
-                Button(action: model.applyAll) {
-                    Label("Apply to All Videos", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(model.isProcessing || model.selectedPlan == nil)
             }
             .padding(14)
         }
@@ -116,41 +119,66 @@ struct VideoOptimizeView: View {
     }
 
     private var workspace: some View {
-        VStack(spacing: 0) {
-            preview
-            Divider()
-            queueHeader
-            Divider()
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(model.items) { item in
-                        VideoOptimizeRow(item: item, selected: model.selectedItemID == item.id,
-                                         select: { model.select(item) },
-                                         save: { model.save(item: item) },
-                                         remove: { model.remove(item: item) })
-                    }
+        GeometryReader { geometry in
+            let usesCompactPreview = geometry.size.height < 620
+            VStack(spacing: 0) {
+                // Reserve space for the output header and a usable queue at the
+                // minimum window height. Trim remains reachable by scrolling here.
+                ScrollView {
+                    preview(compact: usesCompactPreview)
                 }
-                .padding(12)
-            }
-            .kechilScrollbars()
-            if let message = model.statusMessage {
+                .kechilScrollbars()
+                .frame(height: max(180, min(usesCompactPreview ? 440 : 520,
+                                           geometry.size.height - 180)))
                 Divider()
-                HStack(spacing: 8) {
-                    if model.isProcessing { ProgressView().controlSize(.small) }
-                    Text(message).font(.system(size: 10.5)).foregroundStyle(.secondary)
-                    Spacer()
-                    if model.isProcessing { Button("Cancel", action: model.cancel).controlSize(.small) }
+                queueHeader
+                Divider()
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(model.items) { item in
+                            VideoOptimizeRow(item: item, selected: model.isSelected(item),
+                                             select: { model.select(item, modifiers: NSEvent.modifierFlags) },
+                                             save: { model.save(item: item) },
+                                             remove: { model.remove(item: item) })
+                        }
+                    }
+                    .padding(12)
                 }
-                .padding(10)
+                .kechilScrollbars()
+                if let message = model.statusMessage {
+                    Divider()
+                    HStack(spacing: 8) {
+                        if model.isProcessing { ProgressView().controlSize(.small) }
+                        Text(message).font(.system(size: 10.5)).foregroundStyle(.secondary)
+                        Spacer()
+                        if model.isProcessing { Button("Cancel", action: model.cancel).controlSize(.small) }
+                    }
+                    .padding(10)
+                }
             }
         }
     }
 
-    private var preview: some View {
-        VStack(spacing: 8) {
+    private func preview(compact: Bool) -> some View {
+        VStack(spacing: compact ? 8 : 10) {
+            HStack(spacing: 7) {
+                Label("Video preview", systemImage: "play.rectangle")
+                    .font(.system(size: 12.5, weight: .semibold))
+                Spacer()
+                if let duration = sourceDuration {
+                    Text(Self.duration(duration))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             ZStack {
                 RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.92))
-                if let poster = model.selectedItem?.poster {
+                if let player = model.player {
+                    VideoPreviewSurface(player: player)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .allowsHitTesting(false)
+                } else if let poster = model.selectedItem?.poster {
                     Image(nsImage: poster).resizable().aspectRatio(contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
@@ -160,16 +188,17 @@ struct VideoOptimizeView: View {
                                sourceAspect: model.selectedItem?.poster.map { $0.size.width / $0.size.height },
                                focusX: model.settings.cropFocusX,
                                focusY: model.settings.cropFocusY)
+                    .allowsHitTesting(false)
             }
-            .frame(maxWidth: .infinity).frame(height: 225)
+            .frame(maxWidth: .infinity)
+            .frame(height: compact ? 160 : 225)
             if let duration = sourceDuration {
-                HStack(spacing: 8) {
-                    Text(Self.duration(model.previewSeconds)).monospacedDigit()
-                    Slider(value: $model.previewSeconds, in: 0...max(0.01, duration),
-                           onEditingChanged: { editing in if !editing { model.refreshPreview() } })
-                    Text(Self.duration(duration)).monospacedDigit()
-                }
-                .font(.system(size: 9.5)).foregroundStyle(.secondary)
+                playbackControls(duration: duration)
+                VideoTrimRangeControl(duration: duration,
+                                      startSeconds: $model.settings.trimStartSeconds,
+                                      endSeconds: $model.settings.trimEndSeconds,
+                                      playheadSeconds: $model.previewSeconds,
+                                      refreshPreview: model.refreshPreview)
             }
             if let item = model.selectedItem, let descriptor = item.descriptor {
                 VStack(spacing: 3) {
@@ -184,19 +213,74 @@ struct VideoOptimizeView: View {
                 }
             }
         }
-        .padding(12)
+        .padding(compact ? 10 : 12)
+    }
+
+    private func playbackControls(duration: Double) -> some View {
+        HStack(spacing: 8) {
+            Button { model.skipPreview(by: -5) } label: {
+                Image(systemName: "gobackward.5")
+            }
+            .help("Go back 5 seconds")
+            .accessibilityLabel("Go back 5 seconds")
+
+            Button(action: model.togglePlayback) {
+                Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+                    .frame(width: 12)
+            }
+            .help(model.isPlaying ? "Pause preview" : "Play preview")
+            .accessibilityLabel(model.isPlaying ? "Pause preview" : "Play preview")
+
+            Button { model.skipPreview(by: 5) } label: {
+                Image(systemName: "goforward.5")
+            }
+            .help("Go forward 5 seconds")
+            .accessibilityLabel("Go forward 5 seconds")
+
+            Text(Self.playbackTime(model.previewSeconds))
+                .frame(width: 42, alignment: .trailing)
+
+            Slider(
+                value: Binding(
+                    get: { min(max(0, model.previewSeconds), duration) },
+                    set: model.setPreviewPosition
+                ),
+                in: 0...max(0.01, duration),
+                onEditingChanged: model.previewScrubbingChanged
+            )
+            .accessibilityLabel("Playback position")
+            .accessibilityValue(Self.playbackTime(model.previewSeconds))
+
+            Text(Self.playbackTime(duration))
+                .frame(width: 42, alignment: .leading)
+
+            Button(action: model.toggleMute) {
+                Image(systemName: model.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .frame(width: 15)
+            }
+            .help(model.isMuted ? "Unmute preview" : "Mute preview")
+            .accessibilityLabel(model.isMuted ? "Unmute preview" : "Mute preview")
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.regular)
+        .font(.system(size: 11.5, design: .monospaced))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .frame(minHeight: 34)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
     }
 
     private var queueHeader: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Video queue").font(.system(size: 12.5, weight: .semibold))
-                Text("\(model.items.count) queued · \(model.completedCount) ready to save")
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 12).padding(.vertical, 9)
+        BatchOutputHeader(title: "Video queue", queuedCount: model.items.count,
+                          readyCount: model.completedCount, isProcessing: model.isProcessing,
+                          save: model.saveAll, selectedName: model.selectedItemID == nil ? nil : model.selectedItem?.displayName,
+                          selectedCount: model.selectedItemCount,
+                          selectedReadyCount: model.selectedSaveCount,
+                          canSaveSelected: model.canSaveSelected, saveSelected: model.saveSelected)
     }
 
     @ViewBuilder
@@ -218,6 +302,7 @@ struct VideoOptimizeView: View {
                 }
             }
             .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+            .id(model.estimateRevision)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.08)))
         } else {
             Label("Choose a valid trim range and target size.", systemImage: "exclamationmark.triangle")
@@ -242,11 +327,13 @@ struct VideoOptimizeView: View {
 
     private func numericField(_ label: String, value: Binding<Double>, suffix: String) -> some View {
         HStack {
-            Text(label).font(.system(size: 11))
+            Text(label).font(.system(size: 11)).fixedSize(horizontal: true, vertical: false)
             Spacer()
-            TextField("0", value: value, format: .number.precision(.fractionLength(0...2)))
-                .multilineTextAlignment(.trailing).frame(width: 64)
-            Text(suffix).font(.system(size: 10)).foregroundStyle(.secondary).frame(width: 24, alignment: .leading)
+            KechilNumericStepperField(label: label, value: value, step: 1,
+                                      lowerBound: 1, upperBound: 100_000)
+                .frame(width: 104)
+            Text(suffix).font(.system(size: 10)).foregroundStyle(.secondary)
+                .frame(width: 24, alignment: .leading)
         }
     }
 
@@ -268,6 +355,12 @@ struct VideoOptimizeView: View {
     private static func duration(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "—" }
         let total = Int(seconds.rounded())
+        return String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    private static func playbackTime(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds >= 0 else { return "–:––" }
+        let total = Int(seconds.rounded(.down))
         return String(format: "%d:%02d", total / 60, total % 60)
     }
 
@@ -306,13 +399,20 @@ private struct VideoOptimizeRow: View {
                     } ?? ""
                     Text("\(Self.megabytes(item.sourceFileSize)) → \(Self.megabytes(output))\(outputFrame)")
                         .font(.system(size: 9)).foregroundStyle(.tertiary)
+                } else if let descriptor = item.descriptor {
+                    Text("Original: \(descriptor.displayWidth ?? 0) × \(descriptor.displayHeight ?? 0) · \(descriptor.videoCodec ?? "Video")")
+                        .font(.system(size: 9)).foregroundStyle(.tertiary)
                 }
                 if let progress = item.progress, item.stage == .processing {
                     ProgressView(value: progress).progressViewStyle(.linear).frame(maxWidth: 150)
                 }
             }
             Spacer(minLength: 4)
-            if item.isSaveReady { Button("Save…", action: save).controlSize(.small) }
+            if item.isSaveReady {
+                Button("Save…", action: save)
+                    .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+                    .controlSize(.regular)
+            }
             Button(action: remove) { Image(systemName: "xmark") }
                 .buttonStyle(.borderless).foregroundStyle(.tertiary).help("Remove video")
         }

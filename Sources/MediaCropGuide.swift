@@ -7,15 +7,19 @@ struct MediaCropGuide: View {
     let sourceAspect: CGFloat?
     var cropPixelSize: CGSize?
     var sourcePixelSize: CGSize?
+    var cropUpscalePolicy: ImageCropUpscalePolicy = .keepNative
     var focusX: Double = 0.5
     var focusY: Double = 0.5
 
     init(aspect: CGFloat?, sourceAspect: CGFloat?, cropPixelSize: CGSize? = nil,
-         sourcePixelSize: CGSize? = nil, focusX: Double = 0.5, focusY: Double = 0.5) {
+         sourcePixelSize: CGSize? = nil,
+         cropUpscalePolicy: ImageCropUpscalePolicy = .keepNative,
+         focusX: Double = 0.5, focusY: Double = 0.5) {
         self.aspect = aspect
         self.sourceAspect = sourceAspect
         self.cropPixelSize = cropPixelSize
         self.sourcePixelSize = sourcePixelSize
+        self.cropUpscalePolicy = cropUpscalePolicy
         self.focusX = focusX
         self.focusY = focusY
     }
@@ -25,6 +29,7 @@ struct MediaCropGuide: View {
             if let rect = Self.cropRect(aspect: aspect, sourceAspect: sourceAspect,
                                         cropPixelSize: cropPixelSize,
                                         sourcePixelSize: sourcePixelSize,
+                                        cropUpscalePolicy: cropUpscalePolicy,
                                         container: geometry.size, focusX: focusX, focusY: focusY) {
                 Rectangle()
                     .fill(Color.black.opacity(0.42))
@@ -49,9 +54,11 @@ struct MediaCropGuide: View {
 
     /// Returns the crop rectangle inside the aspect-fitted source image. Keeping this
     /// geometry separate prevents a portrait source from getting a guide positioned in
-    /// the black letterbox area around it.
+    /// the black letterbox area around it. For a fill-target custom crop, the guide
+    /// shows the native source area that will be enlarged before the final crop.
     static func cropRect(aspect: CGFloat?, sourceAspect: CGFloat?,
                          cropPixelSize: CGSize? = nil, sourcePixelSize: CGSize? = nil,
+                         cropUpscalePolicy: ImageCropUpscalePolicy = .keepNative,
                          container: CGSize,
                          focusX: Double = 0.5, focusY: Double = 0.5) -> CGRect? {
         let hasCustomSize = cropPixelSize.map { $0.width > 0 && $0.height > 0 } ?? false
@@ -78,9 +85,9 @@ struct MediaCropGuide: View {
         if let cropPixelSize, let sourcePixelSize,
            cropPixelSize.width > 0, cropPixelSize.height > 0,
            sourcePixelSize.width > 0, sourcePixelSize.height > 0 {
-            let bounded = ImageCropGeometry.cropSize(source: sourcePixelSize,
-                                                     aspect: nil,
-                                                     customSize: cropPixelSize)
+            let bounded = ImageCropGeometry.sourceCropSize(
+                source: sourcePixelSize, aspect: nil, customSize: cropPixelSize,
+                cropUpscalePolicy: cropUpscalePolicy)
             cropSize = CGSize(width: bounded.width * imageRect.width / sourcePixelSize.width,
                               height: bounded.height * imageRect.height / sourcePixelSize.height)
         } else if let aspect, imageRatio > aspect {

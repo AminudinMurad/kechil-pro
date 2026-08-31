@@ -17,18 +17,22 @@ public struct StripResult {
     public let format: ImageFormat
     /// True when pixel data was copied verbatim (no re-encode, zero quality loss).
     public let lossless: Bool
+    /// Rendering information intentionally retained; this is not removed metadata.
+    public var preserved: [String] = []
 }
 
 public enum StripError: LocalizedError {
     case emptyFile
     case malformed(String)
     case unreadable(String)
+    case unsupported(String)
 
     public var errorDescription: String? {
         switch self {
         case .emptyFile:            return "File is empty"
         case .malformed(let why):   return "Malformed image: \(why)"
         case .unreadable(let why):  return "Could not read image: \(why)"
+        case .unsupported(let why): return "Cannot safely clean this image: \(why)"
         }
     }
 }
@@ -65,12 +69,14 @@ public enum MetadataStripper {
         // classic source of off-by-N bugs when slicing repeatedly.
         let bytes = [UInt8](data)
 
+        let result: StripResult
         switch detect(bytes) {
-        case .jpeg:  return try stripJPEG(bytes)
-        case .png:   return try stripPNG(bytes)
-        case .webp:  return try stripWebP(bytes)
-        case .other: return try stripViaImageIO(data)   // ImageIOStripper.swift
+        case .jpeg:  result = try stripJPEG(bytes)
+        case .png:   result = try stripPNG(bytes)
+        case .webp:  result = try stripWebP(bytes)
+        case .other: return try stripViaImageIO(data)
         }
+        return try ImageRenderingMetadata.preservingOrientation(of: data, in: result)
     }
 
     public static func strip(fileAt url: URL) throws -> StripResult {

@@ -27,6 +27,8 @@ struct VideoOptimizeChecks {
         settings.targetMegabytes = 8
         let reduced = try VideoSizeTargetPolicy.plan(sourceSize: CGSize(width: 1920, height: 1080),
             sourceFrameRate: 30, sourceDuration: 42, settings: settings)
+        check(reduced.targetBytes == 8_000_000 && reduced.estimatedBytes < plan.estimatedBytes,
+              "changing the target size changes the live output estimate")
         check(reduced.width <= 1280 && reduced.height <= 720 && reduced.resolutionWasReducedForTarget,
               "smart mode lowers resolution before severe artifacts")
 

@@ -2,14 +2,8 @@ import Foundation
 import ImageIO
 import CoreGraphics
 
-// Fallback path for containers we do not parse by hand: HEIC/HEIF, TIFF, AVIF,
-// GIF, BMP, and anything else ImageIO recognises.
-//
-// `CGImageDestinationCopyImageSource` copies the encoded image *without*
-// re-encoding it, and applies a small set of property edits along the way.
-// Setting a metadata dictionary to `kCFNull` deletes it. This keeps the HEIC
-// path lossless too, which matters because iPhone photos are HEIC and are the
-// single most common source of embedded GPS coordinates.
+// Metadata-only copying for ImageIO containers. Unsupported copies fail closed;
+// Clean never substitutes a re-encoded image or flattens an animation to frame zero.
 extension MetadataStripper {
 
     static func stripViaImageIO(_ data: Data) throws -> StripResult {
@@ -24,25 +18,36 @@ extension MetadataStripper {
         // rather than a generic "metadata removed".
         let removed = presentMetadata(in: source)
 
+        let frameCount = CGImageSourceGetCount(source)
+        guard frameCount == 1 else {
+            throw StripError.unsupported("multi-frame/page cleaning is not yet verified without re-encoding; the original is unchanged")
+        }
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
+        let orientation = (properties[kCGImagePropertyOrientation] as? Int) ??
+            (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        guard (1...8).contains(orientation) else {
+            throw StripError.unsupported("invalid display orientation cannot be preserved without re-encoding")
+        }
         let output = NSMutableData()
-        let frameCount = max(1, CGImageSourceGetCount(source))
         guard let dest = CGImageDestinationCreateWithData(output, uti, frameCount, nil) else {
-            throw StripError.unreadable("no encoder available for this format")
+            throw StripError.unsupported("this format has no supported copy without re-encoding")
         }
 
-        // `kCFNull` is imported as an implicitly unwrapped optional. Unwrap it once
-        // through an explicitly typed local: putting the IUO straight into an
-        // `[CFString: Any]` literal boxes an `Optional`, which ImageIO does not
-        // recognise as the delete marker.
-        let delete: CFNull = kCFNull
-
+        // CopyImageSource takes destination-copy options, not property-dictionary
+        // deletion keys. Replace identifying tags and retain display orientation.
+        let metadata = CGImageMetadataCreateMutable()
+        if orientation != 1 {
+            guard CGImageMetadataSetValueMatchingImageProperty(metadata,
+                kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFOrientation,
+                NSNumber(value: orientation)) else {
+                throw StripError.unsupported("display orientation cannot be retained without re-encoding")
+            }
+        }
         let deletions: [CFString: Any] = [
-            kCGImagePropertyExifDictionary:        delete,
-            kCGImagePropertyExifAuxDictionary:     delete,
-            kCGImagePropertyGPSDictionary:         delete,
-            kCGImagePropertyIPTCDictionary:        delete,
-            kCGImagePropertyTIFFDictionary:        delete,
-            kCGImagePropertyMakerAppleDictionary:  delete,
+            kCGImageDestinationMetadata: metadata,
+            kCGImageDestinationMergeMetadata: false,
+            kCGImageMetadataShouldExcludeGPS: true,
+            kCGImageMetadataShouldExcludeXMP: true,
         ]
 
         var cfError: Unmanaged<CFError>?
@@ -55,41 +60,28 @@ extension MetadataStripper {
             var reported = removed
             if neutralized.count > 0 { reported.append("C2PA / Content Credentials") }
 
-            // Prove the edit on its own output. If an unhandled XMP/C2PA carrier still
-            // survives, use the decode/re-encode path and say so rather than returning a
-            // green false-clean result.
+            // Verify the supported copy; never fall back to re-encoding/flattening.
             let verification = ProvenanceProbe.inspect(copied)
-            if verification.hasDetectedMetadata,
-               let reencoded = reencodeStrippingAll(source: source, uti: uti) {
-                let scrubbed = neutralizeC2PABMFFBoxes(in: reencoded)
-                let finalReport = ProvenanceProbe.inspect(scrubbed.data)
-                if !finalReport.hasDetectedMetadata {
-                    if reported.isEmpty { reported.append("All metadata") }
-                    return StripResult(data: scrubbed.data,
-                                       removed: MetadataStripper.dedupe(reported),
-                                       format: .other,
-                                       lossless: false)
-                }
+            guard !verification.hasDetectedMetadata else {
+                throw StripError.unsupported("some metadata cannot be removed without re-encoding; the original is unchanged")
             }
-
+            guard let copiedSource = CGImageSourceCreateWithData(copied as CFData, nil),
+                  CGImageSourceGetType(copiedSource) as String? == uti as String,
+                  CGImageSourceGetCount(copiedSource) == frameCount,
+                  let after = CGImageSourceCopyPropertiesAtIndex(copiedSource, 0, nil) as? [CFString: Any],
+                  sameRenderingProperties(properties, after) else {
+                throw StripError.unsupported("image structure/orientation could not be preserved without re-encoding")
+            }
+            var preserved = ["ImageIO metadata-only copy; no re-encoding"]
+            if orientation != 1 { preserved.append("Display orientation (\(orientation))") }
             return StripResult(data: copied,
                                removed: MetadataStripper.dedupe(reported),
                                format: .other,
-                               lossless: true)
-        }
-
-        // Some formats (notably animated GIF) refuse CopyImageSource. Fall back to
-        // a full re-encode, which drops every metadata block but does touch pixels.
-        // Flagged as lossless: false so the UI can say so honestly.
-        if let reencoded = reencodeStrippingAll(source: source, uti: uti) {
-            return StripResult(data: reencoded,
-                               removed: removed.isEmpty ? ["All metadata"] : removed,
-                               format: .other,
-                               lossless: false)
+                               lossless: true, preserved: preserved)
         }
 
         let why = cfError?.takeRetainedValue().localizedDescription ?? "encoder rejected the copy"
-        throw StripError.unreadable(why)
+        throw StripError.unsupported("this file cannot be copied without re-encoding (\(why))")
     }
 
     /// Inspects which metadata dictionaries the source actually carries.
@@ -107,15 +99,18 @@ extension MetadataStripper {
         return found
     }
 
-    private static func reencodeStrippingAll(source: CGImageSource, uti: CFString) -> Data? {
-        guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
-        let out = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(out, uti, 1, nil) else { return nil }
-        CGImageDestinationAddImage(dest, image, [
-            kCGImageDestinationLossyCompressionQuality: 1.0
-        ] as CFDictionary)
-        guard CGImageDestinationFinalize(dest), out.length > 0 else { return nil }
-        return out as Data
+    private static func sameRenderingProperties(_ before: [CFString: Any], _ after: [CFString: Any]) -> Bool {
+        for key in [kCGImagePropertyPixelWidth, kCGImagePropertyPixelHeight,
+                    kCGImagePropertyDepth, kCGImagePropertyColorModel, kCGImagePropertyProfileName] {
+            if before[key].map({ String(describing: $0) }) != after[key].map({ String(describing: $0) }) {
+                return false
+            }
+        }
+        let beforeOrientation = (before[kCGImagePropertyOrientation] as? Int) ??
+            (before[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        let afterOrientation = (after[kCGImagePropertyOrientation] as? Int) ??
+            (after[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        return beforeOrientation == afterOrientation
     }
 
 }

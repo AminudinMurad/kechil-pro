@@ -29,6 +29,26 @@ enum ScopedGPSImageChecks {
                 "Remove GPS must not recompress or alter pixels")
         require(result.lossless, "Remove GPS must report a lossless copy")
 
+        do {
+            let exifResult = try MetadataStripper.strip(fixture, preset: .exif)
+            let exifOutput = try properties(in: exifResult.data)
+            require(exifOutput[kCGImagePropertyGPSDictionary] != nil,
+                    "Remove EXIF must not remove the separate GPS scope")
+            require(tiffModel(in: exifOutput) == nil && exifDate(in: exifOutput) == nil,
+                    "Remove EXIF must remove camera and capture fields")
+            require(decodedPixels(fixture) == decodedPixels(exifResult.data),
+                    "Remove EXIF must not recompress or alter pixels")
+            require(exifResult.lossless, "Remove EXIF must report a lossless copy")
+        } catch {
+            // A format is allowed to refuse scoped EXIF cleanup when ImageIO
+            // cannot prove a metadata-only copy. It must fail closed with a
+            // user-facing preservation limitation rather than re-encoding.
+            let message = error.localizedDescription.lowercased()
+            require(message.contains("without re-encoding") ||
+                        message.contains("cannot safely clean"),
+                    "Remove EXIF must report an explicit preservation limitation")
+        }
+
         if CommandLine.arguments.count > 1 {
             try checkExternalImage(at: CommandLine.arguments[1])
         }

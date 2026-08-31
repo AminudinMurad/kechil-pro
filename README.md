@@ -1,5 +1,14 @@
 # Kechil PRO
 
+[![Latest release](https://img.shields.io/github/v/release/AminudinMurad/kechil-pro?display_name=tag&sort=semver)](https://github.com/AminudinMurad/kechil-pro/releases/latest)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+[![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black?logo=apple)](docs/INSTALL.md)
+[![No AI co-author metadata](https://github.com/AminudinMurad/kechil-pro/actions/workflows/no-ai-coauthor-metadata.yml/badge.svg)](https://github.com/AminudinMurad/kechil-pro/actions/workflows/no-ai-coauthor-metadata.yml)
+
+A private, local-first macOS image and video utility for cleaning metadata,
+optimising and resizing media, applying visible watermarks, and estimating real
+output sizes as settings change.
+
 A native macOS media utility with three tools. Every tool has separate Images
 and Videos modes with independent queues:
 
@@ -22,6 +31,26 @@ default media save folder, version/copyright information and an inactive update
 placeholder. Setting a default folder makes Save All write there directly with
 collision-safe filenames.
 
+Queue rows use standard macOS multi-selection: click one row, Command-click to
+toggle rows, or Shift-click to select a contiguous range. The last clicked row
+remains the preview primary, while Clean/Optimize/Watermark Selected acts on the
+whole selected set. Save Selected saves one prepared output directly; with several
+selected prepared outputs it asks once for a folder and writes each file separately
+with collision-safe filenames, preserving each output's format and extension.
+Save, Save Selected and Save All share the same green action treatment and width.
+
+## Download v1.0.0
+
+The initial public release is a universal macOS build for Apple Silicon and Intel:
+
+- [Download the DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.dmg)
+- [Download the ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.0/Kechil-PRO-v1.0.0-macos-universal.zip)
+- [Read the complete release notes](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.0)
+
+Both archives have SHA-256 sidecars. This first package is ad-hoc signed for local
+distribution and is not notarised; see [INSTALL.md](docs/INSTALL.md) for the
+Gatekeeper and checksum steps.
+
 Every empty route and the workspace toolbar include **Paste URL**. The field accepts a
 direct `http(s)` image/video URL, a local `file://` URL or an absolute path. The
 clipboard is read only when its icon is clicked. Remote sources are downloaded to a
@@ -34,7 +63,7 @@ Accounts Center, then add the resulting local file to Kechil.
 
 The About card links to the GPL-3.0 terms and provides GitHub, GitHub Sponsors,
 Ko-fi and PayPal links for supporting open-source development. The Updates button
-is currently an offline placeholder and performs no network request.
+is currently a placeholder and performs no network request.
 
 ## Clean is lossless where that is technically possible
 
@@ -55,11 +84,24 @@ tracks and supported metadata are verified, while encoded-frame identity is not 
 Optimize and Watermark intentionally re-render pixels. Their outputs are always passed
 through metadata removal before saving.
 
+Clean shows a selected-source output-size estimate once inspection and the requested
+scope are ready. It measures the same cleaner or unchanged-copy path used by Clean.
+Image Watermark fully encodes the selected image with the current settings, while Video
+Watermark encodes a real short sample with the current codec, audio and quality settings
+and projects that result across the duration. Changing settings cancels stale work and
+remeasures the selected source; after export, the card changes to the prepared output's
+measured byte count. No output is saved merely by changing a setting.
+
 Video target-size mode budgets bitrate from the selected trim duration, audio rate and
 container reserve. Smart can lower resolution when the requested size would otherwise
 cause severe artifacts; Keep Resolution retains dimensions and accepts lower visual
 quality. The UI labels the result as an estimate because codec rate control and source
 complexity can change final bytes.
+
+Optimize queue rows report each source's original dimensions until that item's current
+preview/output has actually been rendered. Selecting another image or video therefore
+shows that item's own source dimensions immediately instead of retaining the previous
+crop result.
 
 ## AI provenance: evidence, not a trust verdict
 
@@ -85,6 +127,7 @@ tools/check.sh                    # type-check plus all deterministic checks
 tools/build-app.sh                # native build
 UNIVERSAL=1 SIGNED=1 tools/build-app.sh
 tools/make-dmg.sh                 # fresh signed universal DMG + SHA-256 sidecar
+tools/make-zip.sh                 # signed universal app ZIP + SHA-256 sidecar
 ```
 
 `tools/check.sh` verifies every vendored libwebp source-file hash before it compiles.

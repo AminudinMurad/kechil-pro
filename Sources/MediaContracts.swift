@@ -11,7 +11,10 @@ enum MediaKind: String, CaseIterable, Identifiable, Codable, Hashable, Sendable 
     var singularTitle: String { self == .image ? "image" : "video" }
     var addLabel: String { self == .image ? "Add Images…" : "Add Videos…" }
     var chooseLabel: String { self == .image ? "Choose Images…" : "Choose Videos…" }
-    var symbol: String { self == .image ? "photo" : "video" }
+    /// Keep the sidebar's image/video glyphs in the same outlined SF Symbol family.
+    /// `photo.on.rectangle` gives Images the same compact, line-led visual weight as
+    /// the `video` camera used by Videos rather than a filled thumbnail treatment.
+    var symbol: String { self == .image ? "photo.on.rectangle" : "video" }
 }
 
 /// The four user-facing Clean choices. A preset is a scope, not a different
@@ -216,6 +219,7 @@ struct MediaAssetDescriptor: Identifiable, @unchecked Sendable {
 }
 
 enum VideoCleanVerification: Hashable, Sendable {
+    case unchanged
     case containerOnlyFramesUnverified
     case samplesPreserved
     case reencoded
@@ -223,6 +227,7 @@ enum VideoCleanVerification: Hashable, Sendable {
 
     var label: String {
         switch self {
+        case .unchanged: return "Unchanged copy; no cleanup applied"
         case .containerOnlyFramesUnverified: return "Container cleaned; frames not re-encoded"
         case .samplesPreserved: return "Media samples preserved"
         case .reencoded: return "Re-encoded to remove metadata"

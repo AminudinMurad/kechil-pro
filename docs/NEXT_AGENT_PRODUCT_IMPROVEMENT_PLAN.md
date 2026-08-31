@@ -141,8 +141,8 @@ The current checkout includes a deliberately bounded first slice of this plan:
   The vendor name is shown only when the evidence text contains it; filenames are not
   used as a source claim.
 - Empty image/video Clean drop zones have Upload file / Paste URL tabs. The inline
-  form accepts local `file://` URLs or absolute paths and deliberately rejects remote
-  HTTP(S) downloads while the app remains offline.
+  form accepts one direct HTTP(S) media URL (downloaded to a temporary local file),
+  a local `file://` URL or an absolute path; processing and final saving stay local.
 
 This slice does not yet deliver the full inspect-first state machine, exact ISO-BMFF
 box offsets/sizes, raw box tree, media-range hashing, or a cryptographically validated
@@ -200,10 +200,11 @@ They are important evidence but should not dominate the first screen.
 
 ### 4.3 Do not copy unsupported reference features
 
-Do not add accounts, cloud profiles, saved locations, online limits, remote downloads,
-or multilingual UI as part of this milestone. Kechil's advantage is native offline
-batch processing. Adapt inspection clarity and verification—not unrelated website
-features.
+Do not add accounts, cloud profiles, saved locations, online limits, remote
+processing, or multilingual UI as part of this milestone. A direct HTTP(S) media
+fetch is already supported as a user-requested temporary local import; keep all
+inspection, processing and saving on-device. Adapt inspection clarity and
+verification—not unrelated website features.
 
 ## 5. Phase 0 — mandatory competitor and baseline test record
 

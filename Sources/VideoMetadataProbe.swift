@@ -162,8 +162,14 @@ enum VideoMetadataProbe {
     private static func category(for identifier: String) -> VideoMetadataFinding.Category {
         if identifier.contains("location") || identifier.contains("iso6709") ||
             identifier.contains("gps") || identifier.contains("xyz") { return .location }
-        if identifier.contains("creation") || identifier.contains("date") ||
-            identifier.contains("time") { return .timestamp }
+        // Do not use a raw `time` substring here: every QuickTime metadata
+        // identifier contains `quicktime`, which would misclassify ordinary
+        // titles/descriptions as container dates. Keep date detection tied to
+        // explicit date/versioned movie-header names.
+        if identifier.contains("creation") || identifier.contains("modification") ||
+            identifier.contains("date") || identifier.contains("timestamp") ||
+            identifier.contains("mvhd") || identifier.contains("tkhd") ||
+            identifier.contains("mdhd") { return .timestamp }
         if identifier.contains("make") || identifier.contains("model") ||
             identifier.contains("software") || identifier.contains("encoder") ||
             identifier.contains("device") { return .device }
@@ -279,25 +285,25 @@ enum VideoMetadataProbe {
             try handle.seek(toOffset: size - 1024 * 1024)
             sample.append(try handle.read(upToCount: 1024 * 1024) ?? Data())
         }
-        let haystack = String(decoding: sample, as: UTF8.self).lowercased()
-        let carriers: [(String, String, VideoMetadataFinding.Category)] = [
-            ("c2pa", "C2PA content-credential carrier", .provenance),
-            ("com.apple.quicktime.location", "QuickTime location carrier", .location),
-            ("©xyz", "QuickTime ISO 6709 location carrier", .location),
-            ("com.apple.quicktime.make", "Camera make carrier", .device),
-            ("com.apple.quicktime.model", "Camera model carrier", .device),
-            ("com.apple.quicktime.software", "Software carrier", .device),
-        ]
-        return carriers.compactMap { marker, name, category in
-            guard haystack.contains(marker) else { return nil }
-            return VideoMetadataFinding(scope: .file, category: category,
-                                        identifier: marker, displayName: name,
-                                        valueSummary: "Carrier detected in the movie container",
-                                        evidence: [VideoMetadataEvidence(
-                                            label: "Carrier", value: marker,
-                                            source: "bounded container scan")],
-                                        removable: true)
+        // Do not classify arbitrary strings in the sampled bytes as metadata.
+        // Descriptions and titles are user-controlled and commonly mention words
+        // such as “C2PA”, “GPS”, or “OpenAI”. Only the structural C2PA detector is
+        // allowed to create a fallback carrier finding here; AVFoundation remains
+        // the source for typed location/device metadata above.
+        guard MediaContainerSanitizer.containsC2PABMFFBoxes(in: sample) else { return [] }
+        var evidence = [VideoMetadataEvidence(
+            label: "Carrier", value: "C2PA",
+            source: "bounded container scan")]
+        if let excerpt = MediaContainerSanitizer.readableC2PAExcerpt(in: sample) {
+            evidence.append(VideoMetadataEvidence(
+                label: "Readable payload", value: excerpt,
+                source: "bounded C2PA carrier"))
         }
+        return [VideoMetadataFinding(scope: .file, category: .provenance,
+                                     identifier: "c2pa", displayName: "C2PA content-credential carrier",
+                                     valueSummary: "Carrier detected in the movie container",
+                                     evidence: evidence,
+                                     removable: true)]
     }
 
     private static func deduplicated(_ findings: [VideoMetadataFinding]) -> [VideoMetadataFinding] {
@@ -326,6 +332,15 @@ extension CleanPreset {
                 [finding.identifier, finding.displayName, finding.valueSummary],
                 markers: ["make", "model", "software", "device", "camera", "lens", "capture"])
         case .aiMetadata:
+            // A caption/title is not an AI carrier merely because its prose
+            // mentions OpenAI or another generator. Keep descriptive fields in
+            // the legacy AI preset; a dedicated provenance/software field can
+            // still match by its typed category or identifier.
+            let descriptive = finding.category == .descriptive || containsAny(
+                [finding.identifier, finding.displayName],
+                markers: ["title", "description", "caption", "comment", "author", "keyword",
+                          "copyright", "©nam", "©des", "©cmt"])
+            if descriptive { return false }
             return finding.category == .provenance || containsAny(
                 [finding.identifier, finding.displayName, finding.valueSummary],
                 markers: ["c2pa", "content credential", "provenance", "jumbf",

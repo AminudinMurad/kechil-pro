@@ -9,6 +9,21 @@ enum WatermarkRendererChecks {
         let defaults = WatermarkConfiguration(source: .text("Kechil"))
         expect(defaults.rotationDegrees == WatermarkDefaults.rotationDegrees,
                "watermark defaults to zero rotation")
+        let logo = WatermarkDefaults.logoAppearance
+        expect(logo.opacity == 0.9 && logo.rotation == 0 && logo.scalePercent == 40 &&
+               logo.position == .centre && logo.marginPercent == 2.5,
+               "logo appearance matches the requested 90%, 0 degrees, 40%, centre and 2.5%")
+        var profiles = WatermarkAppearanceProfiles()
+        var textEdits = WatermarkDefaults.textAppearance
+        textEdits.opacity = 0.60
+        expect(profiles.switching(from: .text, to: .logo, current: textEdits) == logo,
+               "first logo use gets its own defaults, not text adjustments")
+        var logoEdits = logo
+        logoEdits.scalePercent = 25
+        expect(profiles.switching(from: .logo, to: .text, current: logoEdits) == textEdits,
+               "switching back to text restores text adjustments")
+        expect(profiles.switching(from: .text, to: .logo, current: textEdits) == logoEdits,
+               "switching back to logo preserves customized logo settings")
         var configuration = WatermarkConfiguration(source: .text("Kechil"),
                                                    rotationDegrees: 0,
                                                    anchor: .topLeft)

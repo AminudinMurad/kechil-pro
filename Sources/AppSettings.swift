@@ -33,7 +33,11 @@ final class AppSettings: ObservableObject {
                                                 includingResourceValuesForKeys: nil,
                                                 relativeTo: nil)
             UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
-            activate(url)
+            guard activate(url) else {
+                UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
+                defaultSaveDirectoryError = "Kechil could not access this folder. Choose it again."
+                return
+            }
             defaultSaveDirectoryError = nil
         } catch {
             defaultSaveDirectoryError = "Could not remember this folder: \(error.localizedDescription)"
@@ -58,7 +62,11 @@ final class AppSettings: ObservableObject {
                               options: [.withSecurityScope, .withoutUI],
                               relativeTo: nil,
                               bookmarkDataIsStale: &isStale)
-            activate(url)
+            guard activate(url) else {
+                defaultSaveDirectoryError = "The saved folder could not be accessed. Choose it again."
+                UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
+                return
+            }
             if isStale {
                 let refreshed = try url.bookmarkData(options: .withSecurityScope,
                                                      includingResourceValuesForKeys: nil,
@@ -71,11 +79,17 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    private func activate(_ url: URL) {
+    @discardableResult
+    private func activate(_ url: URL) -> Bool {
         if isAccessingDefaultDirectory, let defaultSaveDirectory {
             defaultSaveDirectory.stopAccessingSecurityScopedResource()
         }
-        defaultSaveDirectory = url
         isAccessingDefaultDirectory = url.startAccessingSecurityScopedResource()
+        guard isAccessingDefaultDirectory else {
+            defaultSaveDirectory = nil
+            return false
+        }
+        defaultSaveDirectory = url
+        return true
     }
 }

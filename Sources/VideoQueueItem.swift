@@ -28,6 +28,10 @@ struct VideoQueueItem: Identifiable {
     var statusText: String?
     var savedTo: URL?
     var preset: CleanPreset
+    var sourceIdentity: CleanSourceIdentity?
+    var inspectionReport: VideoMetadataReport?
+    var plan: CleanPlanSummary?
+    var receipt: CleanReceipt?
 
     init(sourceURL: URL) {
         id = UUID()
@@ -39,10 +43,31 @@ struct VideoQueueItem: Identifiable {
         findings = []
         remainingFindings = []
         preset = .allMetadata
+        sourceIdentity = nil
+        inspectionReport = nil
+        plan = nil
+        receipt = nil
     }
 
     var displayName: String { sourceURL.lastPathComponent }
-    var isSaveReady: Bool { outputURL != nil && stage == .completed }
+    /// Findings from the inspected original. Cleanup selection and output
+    /// verification never replace this source-of-truth collection.
+    var sourceFindings: [VideoMetadataFinding] {
+        if !detectedFindings.isEmpty { return detectedFindings }
+        if let inspectionReport { return inspectionReport.findings }
+        return findings
+    }
+    var isSaveReady: Bool {
+        guard outputURL != nil, stage == .completed else { return false }
+        return receipt?.outcome.isOrdinarySaveAllowed ?? true
+    }
+    var saveActionTitle: String {
+        switch verification {
+        case .unchanged: return "Save Unchanged Copy…"
+        case .partial: return "Save Partial Copy…"
+        default: return "Save Clean Copy…"
+        }
+    }
 
     func suggestedFilename(suffix: String, extension ext: String) -> String {
         "\(sourceURL.deletingPathExtension().lastPathComponent)-\(suffix).\(ext)"

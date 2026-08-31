@@ -102,9 +102,12 @@ struct TransformSettingsSnapshot {
     var cropFocusY: Double = 0.5
     var cropWidth = 0.0
     var cropHeight = 0.0
+    /// Custom crop policy is separate from the post-crop resize upscaling setting.
+    var cropUpscalePolicy: ImageCropUpscalePolicy = .keepNative
     var resizeMode: ResizeMode = .none
     var resizeValue: Double = 1600
-    var dontUpscale = true
+    /// When disabled, a resize cannot exceed the pixels retained by the crop.
+    var allowsUpscaling = ImageResizePolicy.allowsUpscalingByDefault
     var outputFormat: ImageOutputFormat = .webp
     var qualityFloor = 60
     var qualityCeiling = 82
@@ -155,9 +158,10 @@ enum TransformPipeline {
         let sourceExtent = image.extent.integral
         image = crop(image, aspect: settings.cropAspect,
                      customWidth: settings.cropWidth, customHeight: settings.cropHeight,
-                     focusX: settings.cropFocusX, focusY: settings.cropFocusY)
+                     focusX: settings.cropFocusX, focusY: settings.cropFocusY,
+                     cropUpscalePolicy: settings.cropUpscalePolicy)
         image = resize(image, mode: settings.resizeMode, value: settings.resizeValue,
-                       dontUpscale: settings.dontUpscale)
+                       allowsUpscaling: settings.allowsUpscaling)
 
         let extent = image.extent.integral
         guard extent.width >= 1, extent.height >= 1,
@@ -202,19 +206,37 @@ enum TransformPipeline {
 
     private static func crop(_ image: CIImage, aspect: CropAspect,
                              customWidth: Double, customHeight: Double,
-                             focusX: Double, focusY: Double) -> CIImage {
+                             focusX: Double, focusY: Double,
+                             cropUpscalePolicy: ImageCropUpscalePolicy) -> CIImage {
         let source = image.extent
         let customSize = aspect == .custom && customWidth > 0 && customHeight > 0
             ? CGSize(width: customWidth, height: customHeight) : nil
         guard aspect != .original else { return normalizeOrigin(image) }
-        let rect = ImageCropGeometry.cropRect(source: source, aspect: aspect.ratio,
+        let upscale = ImageCropGeometry.cropUpscaleScale(
+            source: source.size, customSize: customSize, policy: cropUpscalePolicy)
+        let workingImage = upscale > 1
+            ? image.transformed(by: CGAffineTransform(scaleX: upscale, y: upscale))
+            : image
+        // Use the actual scaled coverage, not Core Image's outward-rounded extent.
+        let coverage = source.applying(CGAffineTransform(scaleX: upscale, y: upscale))
+        var rect = ImageCropGeometry.cropRect(source: coverage,
+                                              aspect: aspect.ratio,
                                               customSize: customSize,
                                               focusX: focusX, focusY: focusY)
-        return normalizeOrigin(image.cropped(to: rect))
+        if aspect == .custom, customSize != nil {
+            // Align before cropping. Fractional crop -> normalize -> recrop looks
+            // exact until Core Image fuses a later resize and loses a border pixel.
+            // A single pixel-aligned crop stays stable through both transforms.
+            rect.origin.x = max(coverage.minX.rounded(.up),
+                min(rect.minX.rounded(), (coverage.maxX - rect.width + 0.000001).rounded(.down)))
+            rect.origin.y = max(coverage.minY.rounded(.up),
+                min(rect.minY.rounded(), (coverage.maxY - rect.height + 0.000001).rounded(.down)))
+        }
+        return normalizeOrigin(workingImage.cropped(to: rect))
     }
 
     private static func resize(_ image: CIImage, mode: ResizeMode, value: Double,
-                               dontUpscale: Bool) -> CIImage {
+                               allowsUpscaling: Bool) -> CIImage {
         guard mode != .none, value > 0 else { return image }
         let size = image.extent.size
         let scale: CGFloat
@@ -225,7 +247,8 @@ enum TransformPipeline {
         case .height: scale = CGFloat(value) / size.height
         case .percent: scale = CGFloat(value / 100)
         }
-        let finalScale = dontUpscale ? min(1, scale) : scale
+        let finalScale = ImageResizePolicy.finalScale(requested: scale,
+                                                       allowsUpscaling: allowsUpscaling)
         guard abs(finalScale - 1) > 0.0001 else { return image }
         return image.transformed(by: CGAffineTransform(scaleX: finalScale, y: finalScale))
     }

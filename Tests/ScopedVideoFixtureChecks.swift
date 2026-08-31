@@ -23,8 +23,10 @@ enum ScopedVideoFixtureChecks {
         expect(scoped.remainingFindings.isEmpty,
                "Content Credentials selection removes the scoped provenance carrier")
         let scopedBytes = try Data(contentsOf: scoped.outputURL)
-        expect(scopedBytes.range(of: Data(identifier.utf8)) == nil,
-               "Content Credentials selection removes the embedded generative ID")
+        expect(!MediaContainerSanitizer.containsC2PABMFFBoxes(in: scopedBytes),
+               "Content Credentials selection removes the structural C2PA carrier")
+        expect(scopedBytes.range(of: Data(identifier.utf8)) != nil,
+               "Content Credentials selection preserves the unselected descriptive copy")
 
         let cleaned = try await VideoCleanPipeline.clean(sourceURL: sourceURL,
                                                           preset: .aiMetadata)

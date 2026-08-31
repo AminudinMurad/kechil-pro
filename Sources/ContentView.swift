@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -15,9 +16,21 @@ struct ContentView: View {
     @State private var showingSettings: Bool
     @State private var showingPasteURL = false
 
-    init(initialRoute: ToolRoute = .cleanImages, showingSettings: Bool = false) {
+    init(initialRoute: ToolRoute = .cleanImages, showingSettings: Bool = false,
+         imageCleanModel: ScrubModel? = nil,
+         imageOptimizeModel: TransformModel? = nil,
+         imageWatermarkModel: TransformModel? = nil,
+         videoCleanModel: VideoCleanModel? = nil,
+         videoOptimizeModel: VideoOptimizeModel? = nil,
+         videoWatermarkModel: VideoWatermarkModel? = nil) {
         _route = State(initialValue: initialRoute)
         _showingSettings = State(initialValue: showingSettings)
+        _imageCleanModel = StateObject(wrappedValue: imageCleanModel ?? ScrubModel())
+        _imageOptimizeModel = StateObject(wrappedValue: imageOptimizeModel ?? TransformModel())
+        _imageWatermarkModel = StateObject(wrappedValue: imageWatermarkModel ?? TransformModel(watermarkMode: true))
+        _videoCleanModel = StateObject(wrappedValue: videoCleanModel ?? VideoCleanModel())
+        _videoOptimizeModel = StateObject(wrappedValue: videoOptimizeModel ?? VideoOptimizeModel())
+        _videoWatermarkModel = StateObject(wrappedValue: videoWatermarkModel ?? VideoWatermarkModel())
     }
 
     var body: some View {
@@ -78,7 +91,18 @@ struct ContentView: View {
                         get: { imageCleanModel.preset },
                         set: { imageCleanModel.selectPreset($0) }),
                         media: .image,
-                        isDisabled: imageCleanModel.isProcessing)
+                        isDisabled: imageCleanModel.isCleaning)
+                    if !imageCleanModel.items.isEmpty {
+                        Divider()
+                        CleanReviewBar(media: .image,
+                                       readyCount: imageCleanModel.readyForReviewCount,
+                                       plannedChangeCount: imageCleanModel.plannedChangeCount,
+                                       preparedCount: imageCleanModel.cleanedCount,
+                                       isInspecting: imageCleanModel.isInspecting,
+                                       isCleaning: imageCleanModel.isCleaning,
+                                       clean: imageCleanModel.cleanAll,
+                                       cancel: imageCleanModel.cancel)
+                    }
                     Divider()
                     if imageCleanModel.items.isEmpty {
                         MediaEmptyState(media: .image, tool: .clean,
@@ -87,8 +111,9 @@ struct ContentView: View {
                                         pasteURL: { imageCleanModel.add(urls: [$0]) })
                     } else {
                         HSplitView {
-                            mainColumn
+                            mainColumn.frame(minWidth: 320, idealWidth: 350)
                             InspectorPanel(model: imageCleanModel)
+                                .frame(minWidth: 330)
                         }
                     }
                 }
@@ -124,7 +149,8 @@ struct ContentView: View {
             if imageCleanModel.isProcessing {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text("Scrubbing…").font(.system(size: 11.5))
+                    Text(imageCleanModel.isCleaning ? "Cleaning…" : "Inspecting…")
+                        .font(.system(size: 11.5))
                     Spacer()
                 }
                 .padding(.horizontal, 16)
@@ -135,8 +161,8 @@ struct ContentView: View {
                 LazyVStack(spacing: 8) {
                     ForEach(imageCleanModel.visibleItems) { item in
                         ItemRow(item: item,
-                                isSelected: imageCleanModel.selectedItemID == item.id,
-                                onSelect: { imageCleanModel.selectedItemID = item.id },
+                                isSelected: imageCleanModel.isSelected(item),
+                                onSelect: { imageCleanModel.select(item, modifiers: NSEvent.modifierFlags) },
                                 onSave: { imageCleanModel.save(item: item) },
                                 onRemove: { imageCleanModel.remove(item: item) })
                     }
@@ -145,7 +171,7 @@ struct ContentView: View {
                             Text("No images carrying \(filter.displayName)")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(.secondary)
-                            Button("Show all") { imageCleanModel.activeFilter = nil }
+                            Button("Show all") { imageCleanModel.selectFilter(nil) }
                                 .controlSize(.small)
                         }
                         .frame(maxWidth: .infinity)
@@ -156,8 +182,17 @@ struct ContentView: View {
             }
             .kechilScrollbars()
             .background(Color(nsColor: .windowBackgroundColor))
+            Divider()
+            CleanBatchFooter(readyCount: imageCleanModel.readyForReviewCount,
+                             plannedChangeCount: imageCleanModel.plannedChangeCount,
+                             preparedCount: imageCleanModel.cleanedCount,
+                             isProcessing: imageCleanModel.isProcessing,
+                             clean: imageCleanModel.cleanAll, cancel: imageCleanModel.cancel,
+                             canCleanSelected: imageCleanModel.canCleanSelected,
+                             selectedHasChanges: imageCleanModel.selectedHasChanges,
+                             selectedCount: imageCleanModel.selectedItemCount,
+                             cleanSelected: imageCleanModel.cleanSelected)
         }
-        .frame(minWidth: 520)
     }
 
     private var workspaceHeader: some View {
@@ -175,16 +210,24 @@ struct ContentView: View {
                 Label("Images", systemImage: "photo").tag(MediaKind.image)
                 Label("Videos", systemImage: "video").tag(MediaKind.video)
             }
-            .pickerStyle(.segmented).labelsHidden().frame(width: 185)
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+            .frame(width: 185)
             if routeCount(route) > 0 {
                 Button("Clear", action: clearCurrent).controlSize(.small)
-                Button("Save All…", action: saveAllCurrent)
-                    .controlSize(.small).disabled(readyCount == 0)
+                BatchSaveButton(readyCount: readyCount, isProcessing: currentIsProcessing,
+                                action: saveAllCurrent)
             }
             Button("Paste URL…") { showingPasteURL = true }
                 .controlSize(.small)
-            Button(route.media.addLabel, action: chooseCurrent)
-                .buttonStyle(.borderedProminent).controlSize(.small)
+            if readyCount > 0 {
+                Button(route.media.addLabel, action: chooseCurrent)
+                    .buttonStyle(.bordered).controlSize(.small)
+            } else {
+                Button(route.media.addLabel, action: chooseCurrent)
+                    .buttonStyle(.borderedProminent).controlSize(.small)
+            }
         }
         .padding(.horizontal, 14).padding(.vertical, 9)
         .background(Color(nsColor: .controlBackgroundColor))
@@ -273,6 +316,17 @@ struct ContentView: View {
         case (.optimize, .video): return videoOptimizeModel.completedCount
         case (.watermark, .image): return imageWatermarkModel.completedCount
         case (.watermark, .video): return videoWatermarkModel.completedCount
+        }
+    }
+
+    private var currentIsProcessing: Bool {
+        switch (route.tool, route.media) {
+        case (.clean, .image): return imageCleanModel.isProcessing
+        case (.clean, .video): return videoCleanModel.isProcessing
+        case (.optimize, .image): return imageOptimizeModel.isProcessing
+        case (.optimize, .video): return videoOptimizeModel.isProcessing
+        case (.watermark, .image): return imageWatermarkModel.isProcessing
+        case (.watermark, .video): return videoWatermarkModel.isProcessing
         }
     }
 
@@ -374,9 +428,10 @@ private struct ItemRow: View {
                     Label("Saved", systemImage: "checkmark.circle.fill")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.green)
-                } else if item.cleanedData != nil {
-                    Button("Save…", action: onSave)
-                        .controlSize(.small)
+                } else if item.isSaveReady {
+                    Button(item.isUnchangedCopy ? "Save Copy…" : "Save…", action: onSave)
+                        .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+                        .controlSize(.regular)
                 }
                 Button(action: onRemove) {
                     Image(systemName: "xmark")
@@ -412,6 +467,9 @@ private struct ItemRow: View {
     }
 
     private var subtitle: String {
+        if item.stage == .queued || item.stage == .analysing || item.stage == .cancelling {
+            return item.statusText ?? item.stage.cleanLabel
+        }
         if item.errorText != nil { return "Could not process" }
         var parts = [item.format.rawValue]
         if let cleaned = item.cleanedSize {
@@ -431,7 +489,13 @@ private struct ItemRow: View {
     /// category's bar in the dashboard chart.
     private var tagFlow: some View {
         HStack(spacing: 5) {
-            if let error = item.errorText {
+            if item.stage == .queued || item.stage == .analysing || item.stage == .cancelling {
+                Tag(text: item.stage.cleanLabel, color: Color.accentColor,
+                    symbol: "doc.text.magnifyingglass")
+            } else if item.stage == .ready {
+                Tag(text: "Ready for review", color: Color.accentColor,
+                    symbol: "list.bullet.clipboard")
+            } else if let error = item.errorText {
                 Tag(text: error, color: .orange, symbol: "exclamationmark.triangle.fill")
             } else if item.verificationState == .remaining {
                 Tag(text: "Metadata still present", color: VizPalette.critical,

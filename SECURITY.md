@@ -57,8 +57,10 @@ software.
 
 ## Verifying a release
 
-Release archives are published with SHA-256 checksums and signatures under
-`releases/`. Verify before installing:
+Release archives are published with SHA-256 checksums under `releases/`. The app
+bundle is ad-hoc signed for local distribution unless the release notes explicitly
+state that a Developer ID signature and notarisation are present. Verify the
+checksum before installing:
 
 ```bash
 shasum -a 256 -c Kechil-PRO-vX.Y.Z-macos-universal.dmg.sha256

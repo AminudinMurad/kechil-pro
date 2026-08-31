@@ -52,14 +52,24 @@ struct ToolSidebar: View {
 
     private func routeButton(_ route: ToolRoute) -> some View {
         Button { selection = route } label: {
-            HStack(spacing: 8) {
-                Image(systemName: route.media.symbol)
-                    .font(.system(size: 11, weight: .semibold)).frame(width: 16)
+            HStack(alignment: .top, spacing: 8) {
+                // Keep the media glyph anchored to the first line of the
+                // route copy. A fixed-height top-aligned slot prevents a
+                // two-line description from pulling the icon toward its
+                // vertical centre.
+                VStack(spacing: 0) {
+                    Image(systemName: route.media.symbol)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .frame(width: 16, height: 16, alignment: .top)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(route.media.title)
                         .font(.system(size: 11.5, weight: selection == route ? .semibold : .regular))
                     Text(detail(for: route))
-                        .font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 2)
                 if count(route) > 0 {
@@ -72,10 +82,16 @@ struct ToolSidebar: View {
             .foregroundStyle(selection == route ? Color.accentColor : Color.primary)
             .padding(.horizontal, 8).padding(.vertical, 7)
             .frame(maxWidth: .infinity, alignment: .leading)
+            // The row is a navigation target, not just its text. With a plain
+            // button style AppKit can otherwise leave transparent HStack space
+            // outside the hit-test region.
+            .contentShape(Rectangle())
             .background(RoundedRectangle(cornerRadius: 7)
                 .fill(selection == route ? Color.accentColor.opacity(0.12) : Color.clear))
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
         .help(route.title)
         .accessibilityLabel("\(route.tool.title), \(route.media.title), \(count(route)) queued")
     }

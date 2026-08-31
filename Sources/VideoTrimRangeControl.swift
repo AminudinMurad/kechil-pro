@@ -1,8 +1,10 @@
+import Foundation
 import SwiftUI
 
-/// Familiar dual-handle video trim control. The playhead can set either marker and
-/// the same handles can be dragged directly. Boundary handles represent no marker,
-/// which keeps the default export range equal to the complete source.
+/// The editor-style trim surface used directly below the video preview. It keeps a
+/// scrubbable preview playhead separate from the two trim boundaries: clicking or
+/// dragging the track previews a frame, while the blue In/Out handles change what
+/// is exported. Boundary handles at the source edges still mean the full source.
 struct VideoTrimRangeControl: View {
     let duration: Double
     @Binding var startSeconds: Double
@@ -10,89 +12,262 @@ struct VideoTrimRangeControl: View {
     @Binding var playheadSeconds: Double
     let refreshPreview: () -> Void
 
-    private let horizontalInset: CGFloat = 15
+    private enum Boundary: Equatable {
+        case start
+        case end
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label(rangeTitle, systemImage: isFullSource ? "arrow.left.and.right" : "scissors")
-                    .font(.system(size: 10.5, weight: .semibold))
-                Spacer()
-                Text("\(Self.time(startSeconds)) – \(Self.time(effectiveEnd))")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-
-            GeometryReader { geometry in
-                let width = max(1, geometry.size.width - horizontalInset * 2)
-                let startX = horizontalInset + width * CGFloat(startSeconds / duration)
-                let endX = horizontalInset + width * CGFloat(effectiveEnd / duration)
-                let playheadX = horizontalInset + width * CGFloat(clampedPlayhead / duration)
-
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color(nsColor: .separatorColor).opacity(0.7))
-                        .frame(width: width, height: 8)
-                        .offset(x: horizontalInset, y: 19)
-                    Capsule().fill(Color.accentColor.opacity(0.48))
-                        .frame(width: max(2, endX - startX), height: 8)
-                        .offset(x: startX, y: 19)
-
-                    Rectangle().fill(Color.orange.opacity(0.9))
-                        .frame(width: 1.5, height: 27)
-                        .position(x: playheadX, y: 23)
-
-                    marker("IN", systemImage: "chevron.right", x: startX, isStart: true,
-                           geometryWidth: geometry.size.width)
-                    marker("OUT", systemImage: "chevron.left", x: endX, isStart: false,
-                           geometryWidth: geometry.size.width)
-                }
-                .coordinateSpace(name: "trimTimeline")
-            }
-            .frame(height: 46)
-
-            HStack(spacing: 6) {
-                Button("Set In") { setIn(at: playheadSeconds) }
-                Button("Set Out") { setOut(at: playheadSeconds) }
-                Spacer()
-                Button("Clear markers", action: clearMarkers)
-                    .disabled(isFullSource)
-            }
-            .controlSize(.small)
-
-            Text(isFullSource
-                 ? "No trim markers set. Export uses the full source duration."
-                 : "Drag the In and Out handles, or set either marker at the orange playhead.")
-                .font(.system(size: 9.5))
-                .foregroundStyle(.tertiary)
+        var label: String { self == .start ? "IN" : "OUT" }
+        var accessibilityLabel: String { self == .start ? "Trim start" : "Trim end" }
+        var systemImage: String { self == .start ? "chevron.left" : "chevron.right" }
+        var help: String {
+            self == .start
+                ? "Drag to choose where the exported clip begins"
+                : "Drag to choose where the exported clip ends"
         }
     }
 
-    private func marker(_ label: String, systemImage: String, x: CGFloat,
-                        isStart: Bool, geometryWidth: CGFloat) -> some View {
-        VStack(spacing: 1) {
-            Text(label)
-                .font(.system(size: 7, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 4).padding(.vertical, 2)
-                .background(Color.accentColor, in: Capsule())
-            Image(systemName: systemImage)
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(Color.accentColor)
-            RoundedRectangle(cornerRadius: 1.5).fill(Color.accentColor)
-                .frame(width: 4, height: 15)
+    private let horizontalInset: CGFloat = 24
+    private let timelineHeight: CGFloat = 72
+    @State private var activeHandle: Boundary?
+    @State private var isScrubbing = false
+    @State private var lastPreviewRefresh = 0.0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            header
+            timeline
+            timingSummary
+            controls
+            Text(helperText)
+                .font(.system(size: 9.5))
+                .foregroundStyle(.tertiary)
         }
-        .frame(width: 34, height: 45)
-        .contentShape(Rectangle())
-        .position(x: min(max(17, x), max(17, geometryWidth - 17)), y: 22)
-        .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("trimTimeline"))
-            .onChanged { drag in
-                let usable = max(1, geometryWidth - horizontalInset * 2)
-                let seconds = Double((drag.location.x - horizontalInset) / usable) * duration
-                if isStart { updateIn(seconds) } else { updateOut(seconds) }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 1)
+        )
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Label("Trim", systemImage: isFullSource ? "arrow.left.and.right" : "scissors")
+                .font(.system(size: 11.5, weight: .semibold))
+            Text(rangeTitle)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text("\(Self.time(startSeconds)) – \(Self.time(effectiveEnd))")
+                .font(.system(size: 9.5, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var timeline: some View {
+        GeometryReader { geometry in
+            let timelineWidth = geometry.size.width
+            let usableWidth = max(1, timelineWidth - horizontalInset * 2)
+            let startX = position(for: startSeconds, usableWidth: usableWidth)
+            let endX = position(for: effectiveEnd, usableWidth: usableWidth)
+            let playheadX = position(for: clampedPlayhead, usableWidth: usableWidth)
+
+            ZStack(alignment: .topLeading) {
+                ruler(usableWidth: usableWidth)
+
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color(nsColor: .separatorColor).opacity(0.62))
+                    .frame(width: usableWidth, height: 10)
+                    .position(x: horizontalInset + usableWidth / 2, y: 30)
+                    .allowsHitTesting(false)
+
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color.accentColor.opacity(0.72))
+                    .frame(width: max(2, endX - startX), height: 10)
+                    .position(x: startX + max(2, endX - startX) / 2, y: 30)
+                    .allowsHitTesting(false)
+
+                scrubTarget(timelineWidth: timelineWidth, usableWidth: usableWidth)
+
+                playhead(x: playheadX)
+                    .zIndex(1)
+
+                handle(.start, x: startX, timelineWidth: timelineWidth,
+                       usableWidth: usableWidth)
+                    .zIndex(2)
+                handle(.end, x: endX, timelineWidth: timelineWidth,
+                       usableWidth: usableWidth)
+                    .zIndex(2)
             }
-            .onEnded { _ in refreshPreview() })
-        .accessibilityLabel("\(label) trim marker")
-        .accessibilityValue(Self.time(isStart ? startSeconds : effectiveEnd))
+            .coordinateSpace(name: "videoTrimTimeline")
+        }
+        .frame(height: timelineHeight)
+    }
+
+    private var timingSummary: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(Self.time(startSeconds))
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Color.accentColor)
+            Spacer()
+            Text("Preview \(Self.time(clampedPlayhead))")
+                .font(.system(size: 9.5, design: .monospaced))
+                .foregroundStyle(Color.orange)
+            Spacer()
+            Text(Self.time(effectiveEnd))
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Color.accentColor)
+        }
+    }
+
+    private var controls: some View {
+        HStack(spacing: 6) {
+            Button { setIn(at: playheadSeconds) } label: {
+                Label("Set start", systemImage: "arrow.backward.to.line")
+            }
+            .help("Set the trim start at the current preview position")
+
+            Button { setOut(at: playheadSeconds) } label: {
+                Label("Set end", systemImage: "arrow.forward.to.line")
+            }
+            .help("Set the trim end at the current preview position")
+
+            Spacer(minLength: 4)
+
+            Button(action: clearMarkers) {
+                Label("Clear", systemImage: "arrow.counterclockwise")
+            }
+            .help("Reset the trim range to the complete source")
+            .disabled(isFullSource)
+        }
+        .controlSize(.small)
+    }
+
+    private func ruler(usableWidth: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(0...16, id: \.self) { tick in
+                let fraction = CGFloat(tick) / 16
+                let isMajor = tick.isMultiple(of: 4)
+                Rectangle()
+                    .fill(Color.secondary.opacity(isMajor ? 0.55 : 0.28))
+                    .frame(width: 1, height: isMajor ? 7 : 4)
+                    .position(x: horizontalInset + usableWidth * fraction,
+                              y: isMajor ? 4 : 5.5)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private func scrubTarget(timelineWidth: CGFloat, usableWidth: CGFloat) -> some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .frame(width: usableWidth, height: 50)
+            .position(x: timelineWidth / 2, y: 30)
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .named("videoTrimTimeline"))
+                    .onChanged { drag in
+                        isScrubbing = true
+                        updatePlayhead(at: drag.location.x, usableWidth: usableWidth)
+                        refreshPreviewWhileInteracting()
+                    }
+                    .onEnded { _ in
+                        isScrubbing = false
+                        lastPreviewRefresh = 0
+                        refreshPreview()
+                    }
+            )
+            .help("Click or drag to preview a different video frame")
+            .accessibilityLabel("Video preview position")
+            .accessibilityValue(Self.time(clampedPlayhead))
+            .accessibilityHint("Drag to scrub the preview without changing the trim range")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment:
+                    nudgePlayhead(by: 0.1)
+                case .decrement:
+                    nudgePlayhead(by: -0.1)
+                @unknown default:
+                    break
+                }
+            }
+    }
+
+    private func handle(_ boundary: Boundary, x: CGFloat, timelineWidth: CGFloat,
+                        usableWidth: CGFloat) -> some View {
+        let isActive = activeHandle == boundary
+        let handleX = min(max(22, x), max(22, timelineWidth - 22))
+
+        return VStack(spacing: 2) {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.accentColor)
+                .frame(width: 16, height: 34)
+                .overlay {
+                    Image(systemName: boundary.systemImage)
+                        .font(.system(size: 8.5, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            Text(boundary.label)
+                .font(.system(size: 7.5, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(Color.accentColor, in: Capsule())
+        }
+        .frame(width: 44, height: timelineHeight)
+        .contentShape(Rectangle())
+        .position(x: handleX, y: timelineHeight / 2)
+        .scaleEffect(isActive ? 1.06 : 1)
+        .shadow(color: isActive ? Color.accentColor.opacity(0.35) : .clear,
+                radius: 4, y: 1)
+        .animation(.easeOut(duration: 0.12), value: isActive)
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .named("videoTrimTimeline"))
+                .onChanged { drag in
+                    activeHandle = boundary
+                    let seconds = seconds(at: drag.location.x, usableWidth: usableWidth)
+                    if boundary == .start { updateIn(seconds) } else { updateOut(seconds) }
+                    refreshPreviewWhileInteracting()
+                }
+                .onEnded { _ in
+                    activeHandle = nil
+                    lastPreviewRefresh = 0
+                    refreshPreview()
+                }
+        )
+        .help(boundary.help)
+        .accessibilityLabel(boundary.accessibilityLabel)
+        .accessibilityValue(Self.time(boundary == .start ? startSeconds : effectiveEnd))
+        .accessibilityHint(boundary.help)
+        .accessibilityAdjustableAction { direction in
+            let delta = direction == .increment ? 0.1 : -0.1
+            if boundary == .start {
+                updateIn(startSeconds + delta)
+            } else {
+                updateOut(effectiveEnd + delta)
+            }
+            refreshPreview()
+        }
+    }
+
+    private func playhead(x: CGFloat) -> some View {
+        ZStack(alignment: .top) {
+            Circle()
+                .fill(Color.orange)
+                .frame(width: 10, height: 10)
+                .offset(y: 12)
+            RoundedRectangle(cornerRadius: 1)
+                .fill(Color.orange.opacity(0.95))
+                .frame(width: 2, height: 38)
+                .offset(y: 18)
+        }
+        .frame(width: 14, height: timelineHeight, alignment: .top)
+        .position(x: x, y: timelineHeight / 2)
+        .scaleEffect(isScrubbing ? 1.12 : 1)
+        .animation(.easeOut(duration: 0.12), value: isScrubbing)
+        .allowsHitTesting(false)
     }
 
     private var effectiveEnd: Double {
@@ -103,7 +278,40 @@ struct VideoTrimRangeControl: View {
     private var isFullSource: Bool {
         VideoTrimRangePolicy.isFullSource(start: startSeconds, end: endSeconds)
     }
-    private var rangeTitle: String { isFullSource ? "Full source" : "Trimmed range" }
+    private var rangeTitle: String { isFullSource ? "Full source" : "Selected range" }
+    private var helperText: String {
+        isFullSource
+            ? "Drag the timeline to preview a frame, then set a start or end. Export uses the full source."
+            : "Drag the blue In and Out handles to trim, or move the playhead and set either boundary."
+    }
+
+    private func position(for seconds: Double, usableWidth: CGFloat) -> CGFloat {
+        let fraction = CGFloat(min(max(0, seconds), duration) / duration)
+        return horizontalInset + usableWidth * fraction
+    }
+
+    private func seconds(at x: CGFloat, usableWidth: CGFloat) -> Double {
+        let fraction = min(max((x - horizontalInset) / usableWidth, 0), 1)
+        return Double(fraction) * duration
+    }
+
+    private func updatePlayhead(at x: CGFloat, usableWidth: CGFloat) {
+        playheadSeconds = seconds(at: x, usableWidth: usableWidth)
+    }
+
+    private func nudgePlayhead(by delta: Double) {
+        playheadSeconds = min(max(0, playheadSeconds + delta), duration)
+        refreshPreview()
+    }
+
+    private func refreshPreviewWhileInteracting() {
+        // Pointer drags emit many events per second. Limiting preview work while a
+        // gesture is active keeps both the range and the preview responsive.
+        let now = Date.timeIntervalSinceReferenceDate
+        guard now - lastPreviewRefresh >= 0.1 else { return }
+        lastPreviewRefresh = now
+        refreshPreview()
+    }
 
     private func updateIn(_ proposed: Double) {
         startSeconds = VideoTrimRangePolicy.start(proposed: proposed, duration: duration,

@@ -29,7 +29,8 @@ enum TransformPreviewChecks {
 
         model.resizeMode = .width
         model.resizeValue = 80
-        model.dontUpscale = false
+        expect(model.allowsUpscaling,
+               "Image Optimize enables upscaling by default")
         model.refreshOptimizePreview()
         try await waitUntil("resize preview") {
             !model.isOptimizePreviewRendering && model.optimizePreviewWidth == 80

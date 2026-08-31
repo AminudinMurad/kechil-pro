@@ -34,6 +34,16 @@ struct MediaCropGuideChecks {
             customSize: CGSize(width: 1400, height: 375))
         expect(bounded == CGSize(width: 1000, height: 375),
                "custom dimensions clamp independently without proportional scaling")
+
+        let filled = MediaCropGuide.cropRect(
+            aspect: nil, sourceAspect: 1000.0 / 600.0,
+            cropPixelSize: CGSize(width: 1400, height: 375),
+            sourcePixelSize: CGSize(width: 1000, height: 600),
+            cropUpscalePolicy: .fillTarget,
+            container: CGSize(width: 600, height: 400))
+        expect(abs((filled?.width ?? 0) - 600) < 0.01 &&
+               abs((filled?.height ?? 0) - (600 * 375 / 1000 / 1.4)) < 0.01,
+               "fill-target guide shows the native area retained before enlargement")
         print("Media crop guide checks passed")
     }
 

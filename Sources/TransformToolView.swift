@@ -1,18 +1,31 @@
+import AppKit
 import SwiftUI
 
 struct TransformToolView: View {
     @ObservedObject var model: TransformModel
     @State private var showsOriginal = false
     @State private var resizeUsesSourceDefault = true
+    @State private var resizeDefaultSeeded = false
+
+    init(model: TransformModel, initiallyShowsOriginal: Bool = false) {
+        self.model = model
+        _showsOriginal = State(initialValue: initiallyShowsOriginal)
+    }
 
     var body: some View {
         HSplitView {
             controls
-                .frame(minWidth: 260, idealWidth: 300, maxWidth: 340)
+                .frame(minWidth: OptimizeWorkspaceLayout.settingsMinimumWidth,
+                       idealWidth: OptimizeWorkspaceLayout.settingsIdealWidth,
+                       maxWidth: OptimizeWorkspaceLayout.settingsMaximumWidth)
             queue
-                .frame(minWidth: 470)
+                .frame(minWidth: OptimizeWorkspaceLayout.outputMinimumWidth)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear {
+            // Reopening a route with existing settings must not reseed its target.
+            if model.resizeMode != .none, retainedCropSize != nil { resizeDefaultSeeded = true }
+        }
         // The preview is intentionally live, while queue outputs remain committed
         // only by Apply to All. A single settings key keeps all controls in sync,
         // including text fields and slider drags.
@@ -26,6 +39,7 @@ struct TransformToolView: View {
         .onChange(of: model.resizeMode) { mode in
             guard mode != .none else { return }
             resizeUsesSourceDefault = true
+            resizeDefaultSeeded = false
             seedResizeValue(for: mode)
         }
         .onChange(of: cropGeometryKey) { _ in
@@ -33,10 +47,34 @@ struct TransformToolView: View {
             if resizeUsesSourceDefault, model.resizeMode != .none {
                 seedResizeValue(for: model.resizeMode)
             }
+            if !model.allowsUpscaling { clampResizeValueToCroppedSource() }
+        }
+        .onChange(of: model.allowsUpscaling) { allowsUpscaling in
+            if !allowsUpscaling { clampResizeValueToCroppedSource() }
+        }
+        .onChange(of: model.selectedItemID) { _ in
+            seedMissingDimensions()
+            model.refreshOptimizePreview()
+        }
+        .onChange(of: model.knownCropSourceCount) { _ in
+            seedMissingDimensions()
         }
     }
 
     private var controls: some View {
+        VStack(spacing: 0) {
+            settingsControls
+            Divider()
+            ToolApplyActions(operation: "Optimize", canProcessAll: model.canProcessAll,
+                             canProcessSelected: model.canProcessSelected,
+                             processAll: model.reprocessAll, processSelected: model.reprocessSelected,
+                             selectedCount: model.selectedItemCount)
+                .padding(14)
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private var settingsControls: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Label("Image settings", systemImage: "slider.horizontal.3")
@@ -58,14 +96,28 @@ struct TransformToolView: View {
                     if model.cropAspect != .original {
                         if model.cropAspect == .custom {
                             HStack(spacing: 8) {
-                                cropDimensionField("Width", value: $model.cropWidth)
+                                cropDimensionField(.width)
                                 Text("×").font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(.secondary)
-                                cropDimensionField("Height", value: $model.cropHeight)
+                                cropDimensionField(.height)
                             }
+                            Toggle("Link target ratio", isOn: $model.locksCustomCropAspect)
+                                .font(.system(size: 11.5))
+                                .help("Uses the selected image ratio when enabled, then keeps that ratio for the whole batch.")
+                                .accessibilityHint("The linked ratio stays fixed when you select another image.")
+                            Toggle("Enlarge smaller images to fill target", isOn: cropUpscaleBinding)
+                                .font(.system(size: 11.5))
+                                .help("Smaller sources are enlarged uniformly until they cover the custom crop, then cropped to the exact target.")
+                                .accessibilityHint("When enabled, smaller queued images are enlarged uniformly to cover the custom crop before cropping.")
                             Text(customCropHelp)
                                 .font(.system(size: 10))
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.secondary)
+                            Text(cropUpscaleHelp)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                            Text(model.batchCropImpactSummary)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
                         }
                         sliderRow("Focus X", value: $model.cropFocusX, range: 0...1,
                                   format: { $0 == 0 ? "Left" : $0 == 1 ? "Right" : "Centre" })
@@ -85,13 +137,24 @@ struct TransformToolView: View {
                         HStack {
                             Text(resizeValueLabel).font(.system(size: 11.5))
                             Spacer()
-                            TextField("Value", value: resizeValueBinding,
-                                      format: .number.precision(.fractionLength(0)))
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 68)
+                            HStack(spacing: 4) {
+                                KechilNumericStepperField(label: "\(resizeValueLabel) (\(resizeValueUnit))",
+                                                    value: resizeValueBinding,
+                                                    step: 1,
+                                                    lowerBound: 1,
+                                                    upperBound: resizeInputMaximum)
+                                    .frame(width: 82)
+                                Text(resizeValueUnit)
+                                    .font(.system(size: 9.5)).foregroundStyle(.tertiary)
+                            }
                         }
-                        Toggle("Do not upscale", isOn: $model.dontUpscale)
+                        Toggle("Allow upscaling after crop", isOn: $model.allowsUpscaling)
                             .font(.system(size: 11.5))
+                            .help("Controls enlargement after cropping. When disabled, the export cannot exceed its cropped source pixels.")
+                            .accessibilityHint("Controls resize enlargement after cropping. When disabled, output dimensions are capped at the cropped image dimensions.")
+                        Text(upscalingHelp)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
                     }
                 }
 
@@ -122,26 +185,19 @@ struct TransformToolView: View {
                     HStack {
                         Text("Target KB").font(.system(size: 11.5))
                         Spacer()
-                        TextField("Off", value: $model.targetKilobytes,
-                                  format: .number.precision(.fractionLength(0)))
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 68)
+                        KechilNumericStepperField(label: "Target kilobytes",
+                                            value: $model.targetKilobytes,
+                                            step: 10,
+                                            lowerBound: 0)
+                            .frame(width: 82)
                     }
                     Text("Set to 0 to keep the quality result without a byte target.")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.tertiary)
                 }
 
-                Button {
-                    model.reprocessAll()
-                } label: {
-                    Label("Apply to All", systemImage: "arrow.clockwise")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(model.items.isEmpty || model.isProcessing)
 
-                Text("Preview updates as settings change. Use Apply to All to commit the current settings to the queue.")
+                Text("Preview updates as settings change. Optimize Selected processes the highlighted file; Optimize All processes the whole queue. Save outputs separately.")
                     .font(.system(size: 10.5))
                     .foregroundStyle(.tertiary)
             }
@@ -153,22 +209,12 @@ struct TransformToolView: View {
 
     private var queue: some View {
         VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Batch output")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("\(model.items.count) queued · \(model.completedCount) ready")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if model.isProcessing {
-                    ProgressView().controlSize(.small)
-                    Text("Processing…").font(.system(size: 11.5))
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            BatchOutputHeader(queuedCount: model.items.count, readyCount: model.completedCount,
+                              isProcessing: model.isProcessing, save: model.saveAll,
+                              selectedName: model.selectedItemID == nil ? nil : model.selectedItem?.displayName,
+                              selectedCount: model.selectedItemCount,
+                              selectedReadyCount: model.selectedSaveCount,
+                              canSaveSelected: model.canSaveSelected, saveSelected: model.saveSelected)
             Divider()
 
             if model.items.isEmpty {
@@ -183,8 +229,9 @@ struct TransformToolView: View {
                     LazyVStack(spacing: 8) {
                         ForEach(model.items) { item in
                             TransformItemRow(item: item,
-                                             selected: model.selectedItemID == item.id,
-                                             onSelect: { model.select(item) },
+                                             cropPrediction: model.cropPrediction(for: item),
+                                             selected: model.isSelected(item),
+                                             onSelect: { model.select(item, modifiers: NSEvent.modifierFlags) },
                                              onSave: { model.save(item: item) },
                                              onRemove: { model.remove(item: item) })
                         }
@@ -215,7 +262,7 @@ struct TransformToolView: View {
                 }
                 .pickerStyle(.segmented).labelsHidden().frame(width: 210)
                 Spacer()
-                Text(model.cropAspect != .original ? "Crop guide" : "Preview")
+                Text(showsOriginal ? "Original" : (model.cropAspect != .original ? "Crop guide" : "Preview"))
                     .font(.system(size: 9.5, weight: .medium)).foregroundStyle(.secondary)
             }
             ZStack {
@@ -227,13 +274,14 @@ struct TransformToolView: View {
                 } else {
                     Image(systemName: "photo").font(.system(size: 34)).foregroundStyle(.white.opacity(0.4))
                 }
-                if model.cropAspect != .original,
+                if !showsOriginal, model.cropAspect != .original,
                    let item = model.selectedItem,
                    let sourceAspect = sourceAspect(for: item) {
                     MediaCropGuide(aspect: model.cropAspect.ratio,
                                    sourceAspect: sourceAspect,
                                    cropPixelSize: customCropSize,
                                    sourcePixelSize: sourcePixelSize(for: item),
+                                   cropUpscalePolicy: model.cropUpscalePolicy,
                                    focusX: model.cropFocusX,
                                    focusY: model.cropFocusY)
                 }
@@ -252,21 +300,15 @@ struct TransformToolView: View {
                 Text(model.selectedItem?.displayName ?? "Select an image")
                     .font(.system(size: 10.5, weight: .medium)).lineLimit(1).truncationMode(.middle)
                 Spacer()
-                if let item = model.selectedItem {
-                    let width = model.optimizePreviewItemID == item.id
-                        ? model.optimizePreviewWidth ?? item.width
-                        : item.width
-                    let height = model.optimizePreviewItemID == item.id
-                        ? model.optimizePreviewHeight ?? item.height
-                        : item.height
-                    let format = model.optimizePreviewItemID == item.id
-                        ? model.optimizePreviewFormat?.rawValue ?? item.outputFormat?.rawValue
-                        : item.outputFormat?.rawValue
-                    if let width, let height {
-                        Text("\(width) × \(height) · \(format ?? "Output")")
-                            .font(.system(size: 9.5)).foregroundStyle(.secondary)
-                    }
+                if let item = model.selectedItem, let dimensions = dimensionSummary(for: item) {
+                    Text(dimensions)
+                        .font(.system(size: 9.5)).foregroundStyle(.secondary)
                 }
+            }
+            if let error = model.optimizePreviewError, !showsOriginal {
+                Text("Preview unavailable: \(error)")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(12)
@@ -277,8 +319,9 @@ struct TransformToolView: View {
             model.cropAspect.rawValue,
             String(model.cropFocusX), String(model.cropFocusY),
             String(model.cropWidth), String(model.cropHeight),
+            model.cropUpscalePolicy.rawValue,
             model.resizeMode.rawValue, String(model.resizeValue),
-            String(model.dontUpscale), model.outputFormat.rawValue,
+            String(model.allowsUpscaling), model.outputFormat.rawValue,
             String(model.qualityFloor), String(model.qualityCeiling),
             String(model.targetKilobytes), String(model.webPLossless),
             String(model.webPMethod),
@@ -286,21 +329,30 @@ struct TransformToolView: View {
     }
 
     private var cropGeometryKey: String {
-        let item = model.selectedItem
         return [
-            item?.id.uuidString ?? "none",
-            String(item?.sourceWidth ?? item?.width ?? 0),
-            String(item?.sourceHeight ?? item?.height ?? 0),
             model.cropAspect.rawValue,
             String(model.cropWidth), String(model.cropHeight),
+            model.cropUpscalePolicy.rawValue,
         ].joined(separator: "|")
     }
 
     private var resizeValueBinding: Binding<Double> {
         Binding(get: { model.resizeValue }, set: { value in
             resizeUsesSourceDefault = false
-            model.resizeValue = value
+            model.resizeValue = boundedResizeValue(value)
         })
+    }
+
+    private enum CropDimension {
+        case width
+        case height
+
+        var title: String {
+            switch self {
+            case .width: return "Width"
+            case .height: return "Height"
+            }
+        }
     }
 
     private func optimizedImage(for item: TransformItem) -> NSImage? {
@@ -323,18 +375,27 @@ struct TransformToolView: View {
         if let size = sourcePixelSize(for: item), size.height > 0 {
             return size.width / size.height
         }
-        guard let image = item.sourceThumbnail, image.size.width > 0, image.size.height > 0 else {
-            guard let width = item.width, let height = item.height, height > 0 else { return nil }
-            return CGFloat(width) / CGFloat(height)
-        }
+        guard let image = item.sourceThumbnail, image.size.width > 0, image.size.height > 0 else { return nil }
         return image.size.width / image.size.height
     }
 
     private func sourcePixelSize(for item: TransformItem) -> CGSize? {
-        guard let width = item.sourceWidth ?? item.width,
-              let height = item.sourceHeight ?? item.height,
+        guard let width = item.sourceWidth,
+              let height = item.sourceHeight,
               width > 0, height > 0 else { return nil }
         return CGSize(width: width, height: height)
+    }
+
+    private func dimensionSummary(for item: TransformItem) -> String? {
+        guard let source = sourcePixelSize(for: item) else { return nil }
+        if !showsOriginal,
+           model.optimizePreviewItemID == item.id,
+           let width = model.optimizePreviewWidth,
+           let height = model.optimizePreviewHeight {
+            let format = model.optimizePreviewFormat?.rawValue ?? "Output"
+            return "Preview: \(width) × \(height) · \(format)"
+        }
+        return "Original: \(Int(source.width)) × \(Int(source.height))"
     }
 
     private var customCropSize: CGSize? {
@@ -344,21 +405,53 @@ struct TransformToolView: View {
         return CGSize(width: model.cropWidth, height: model.cropHeight)
     }
 
+    private var cropUpscaleBinding: Binding<Bool> {
+        Binding(get: { model.cropUpscalePolicy == .fillTarget },
+                set: { model.cropUpscalePolicy = $0 ? .fillTarget : .keepNative })
+    }
+
     private var retainedCropSize: CGSize? {
         guard let item = model.selectedItem, let source = sourcePixelSize(for: item) else {
             return nil
         }
         return ImageCropGeometry.cropSize(source: source,
                                           aspect: model.cropAspect.ratio,
-                                          customSize: customCropSize)
+                                          customSize: customCropSize,
+                                          cropUpscalePolicy: model.cropUpscalePolicy)
     }
 
     private var customCropHelp: String {
-        if let source = model.selectedItem.flatMap(sourcePixelSize),
-           let retained = retainedCropSize {
-            return "Independent pixels · retained area \(Int(retained.width)) × \(Int(retained.height)) of \(Int(source.width)) × \(Int(source.height))"
+        if model.locksCustomCropAspect {
+            return "The linked target ratio stays fixed across the batch."
         }
-        return "Width and height are independent. Oversized values are clamped per source."
+        if let target = model.customCropTargetSize {
+            return "Independent target pixels · \(Int(target.width)) × \(Int(target.height))"
+        }
+        return "Width and height are independent target pixels."
+    }
+
+    private var cropUpscaleHelp: String {
+        guard let target = model.customCropTargetSize else {
+            return "Enter a custom crop target to choose how smaller sources are handled."
+        }
+        switch model.cropUpscalePolicy {
+        case .keepNative:
+            return "Keeps native pixels. Smaller crops may be below \(Int(target.width)) × \(Int(target.height)) before Resize."
+        case .fillTarget:
+            return "Enlarges smaller images to cover \(Int(target.width)) × \(Int(target.height)), then crops exactly. No stretching; enlargement may look softer. Resize runs afterward."
+        }
+    }
+
+    private var resizeInputMaximum: Double? {
+        // Pixel targets belong to the batch. The pipeline caps each image separately.
+        !model.allowsUpscaling && model.resizeMode == .percent ? 100 : nil
+    }
+
+    private var upscalingHelp: String {
+        if model.allowsUpscaling {
+            return "Resize may enlarge the cropped result beyond its current pixels."
+        }
+        return "Each image is capped at its own dimensions after crop. The batch target stays unchanged."
     }
 
     private func seedCustomCropFromSource() {
@@ -367,11 +460,19 @@ struct TransformToolView: View {
         if model.cropHeight <= 0 { model.cropHeight = Double(retained.height) }
     }
 
+    private func seedMissingDimensions() {
+        if model.cropAspect == .custom { seedCustomCropFromSource() }
+        if !resizeDefaultSeeded, resizeUsesSourceDefault, model.resizeMode != .none {
+            seedResizeValue(for: model.resizeMode)
+        }
+    }
+
     private func seedResizeValue(for mode: ResizeMode) {
         guard let size = retainedCropSize else {
-            if mode == .percent { model.resizeValue = 100 }
+            if mode == .percent { model.resizeValue = 100; resizeDefaultSeeded = true }
             return
         }
+        resizeDefaultSeeded = true
         switch mode {
         case .none: break
         case .longEdge: model.resizeValue = Double(max(size.width, size.height).rounded())
@@ -381,27 +482,58 @@ struct TransformToolView: View {
         }
     }
 
-    private func cropDimensionField(_ label: String, value: Binding<Double>) -> some View {
+    private func cropDimensionField(_ dimension: CropDimension) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(.system(size: 9.5)).foregroundStyle(.secondary)
+            Text(dimension.title).font(.system(size: 9.5)).foregroundStyle(.secondary)
             HStack(spacing: 4) {
-                TextField(label, value: value,
-                          format: .number.precision(.fractionLength(0)))
-                    .multilineTextAlignment(.trailing)
-                    .frame(minWidth: 62)
+                KechilNumericStepperField(label: "Crop \(dimension.title.lowercased())",
+                                    value: cropDimensionBinding(for: dimension),
+                                    step: 1,
+                                    lowerBound: 1)
+                    .frame(minWidth: 78)
                 Text("px").font(.system(size: 9.5)).foregroundStyle(.tertiary)
             }
         }
     }
 
+    private func cropDimensionBinding(for dimension: CropDimension) -> Binding<Double> {
+        Binding(get: {
+            switch dimension {
+            case .width: return model.cropWidth
+            case .height: return model.cropHeight
+            }
+        }, set: { value in
+            setCropDimension(dimension, to: value)
+        })
+    }
+
+    private func setCropDimension(_ dimension: CropDimension, to proposedValue: Double) {
+        model.setCropDimension(isWidth: dimension == .width, value: proposedValue)
+    }
+
+    private func boundedResizeValue(_ value: Double) -> Double {
+        let rounded = max(1, value.isFinite ? value.rounded() : 1)
+        guard let maximum = resizeInputMaximum else { return rounded }
+        return min(rounded, maximum)
+    }
+
+    private func clampResizeValueToCroppedSource() {
+        guard model.resizeMode != .none else { return }
+        model.resizeValue = boundedResizeValue(model.resizeValue)
+    }
+
     private var resizeValueLabel: String {
         switch model.resizeMode {
-        case .longEdge: return "Long edge (px)"
-        case .width: return "Width (px)"
-        case .height: return "Height (px)"
-        case .percent: return "Scale (%)"
+        case .longEdge: return "Long edge"
+        case .width: return "Width"
+        case .height: return "Height"
+        case .percent: return "Scale"
         case .none: return ""
         }
+    }
+
+    private var resizeValueUnit: String {
+        model.resizeMode == .percent ? "%" : "px"
     }
 
     private func settingSection<Content: View>(_ title: String,
@@ -436,6 +568,7 @@ struct TransformToolView: View {
 
 private struct TransformItemRow: View {
     let item: TransformItem
+    var cropPrediction: String? = nil
     let selected: Bool
     let onSelect: () -> Void
     let onSave: () -> Void
@@ -462,6 +595,10 @@ private struct TransformItemRow: View {
                 Text(detail)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                if let cropPrediction {
+                    Text(cropPrediction)
+                        .font(.system(size: 10.5)).foregroundStyle(.secondary)
+                }
                 if let conflict = item.statusText {
                     Label(conflict, systemImage: "exclamationmark.triangle.fill")
                         .font(.system(size: 10.5))
@@ -481,7 +618,9 @@ private struct TransformItemRow: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.green)
                 } else if item.outputData != nil {
-                    Button("Save…", action: onSave).controlSize(.small)
+                    Button("Save…", action: onSave)
+                        .buttonStyle(KechilSaveButtonStyle(width: KechilActionMetrics.saveButtonWidth))
+                        .controlSize(.regular)
                 }
                 Button(action: onRemove) { Image(systemName: "xmark") }
                     .buttonStyle(.borderless)
@@ -501,7 +640,10 @@ private struct TransformItemRow: View {
     private var detail: String {
         if let error = item.errorText { return "Could not process: \(error)" }
         guard let outputSize = item.outputSize, let width = item.width, let height = item.height else {
-            return "Waiting to process · \(Fmt.bytes(item.originalSize))"
+            if let sourceWidth = item.sourceWidth, let sourceHeight = item.sourceHeight {
+                return "Original \(sourceWidth) × \(sourceHeight) · Waiting to process · \(Fmt.bytes(item.originalSize))"
+            }
+            return "Original dimensions pending · Waiting to process · \(Fmt.bytes(item.originalSize))"
         }
         var parts = ["\(Fmt.bytes(item.originalSize)) → \(Fmt.bytes(outputSize))", "\(width) × \(height)"]
         if let quality = item.quality { parts.append("q\(quality)") }

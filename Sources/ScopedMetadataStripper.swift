@@ -9,20 +9,25 @@ extension MetadataStripper {
         guard preset != .allMetadata else { return try strip(data) }
         guard !data.isEmpty else { throw StripError.emptyFile }
 
+        let result: StripResult
         switch preset {
-        case .allMetadata:
-            return try strip(data)
         case .aiMetadata:
             switch detect(data) {
-            case .jpeg: return try ScopedMetadataStripper.stripJPEGAI(data)
-            case .png:  return try ScopedMetadataStripper.stripPNGAI(data)
-            case .webp: return try ScopedMetadataStripper.stripWebPAI(data)
+            case .jpeg: result = try ScopedMetadataStripper.stripJPEGAI(data)
+            case .png:  result = try ScopedMetadataStripper.stripPNGAI(data)
+            case .webp: result = try ScopedMetadataStripper.stripWebPAI(data)
             case .other:
-                return try ScopedMetadataStripper.stripViaImageIO(data, preset: preset)
+                result = try ScopedMetadataStripper.stripViaImageIO(data, preset: preset)
             }
         case .exif, .gps:
-            return try ScopedMetadataStripper.stripViaImageIO(data, preset: preset)
+            result = try ScopedMetadataStripper.stripViaImageIO(data, preset: preset)
+        case .allMetadata:
+            return try strip(data)
         }
+        // AI cleanup can remove an EXIF carrier that also held the display
+        // orientation. Reinsert only the canonical orientation tag when it is
+        // absent; never silently rotate or recompress the image.
+        return try ImageRenderingMetadata.preservingOrientation(of: data, in: result)
     }
 }
 
@@ -38,6 +43,16 @@ private enum ScopedMetadataStripper {
         "gpt-image", "openai image", "ideogram", "leonardo.ai", "leonardo ai",
         "flux.1", "black forest labs", "negative prompt", "sampler:",
         "cfg scale:", "model hash", "digital sourcetype", "digital source type",
+    ]
+
+    /// A scoped AI operation must not delete a carrier that also contains an
+    /// unselected caption, credit, rights or location field. A field-level XMP
+    /// rewrite can be added later; until then the safe result is an explicit
+    /// unsupported error rather than a silent loss of unrelated metadata.
+    private static let protectedMarkers = [
+        "copyright", "rights", "license", "creator", "author", "caption", "description",
+        "credit", "source", "title", "subject", "keyword", "iptc", "gps", "location",
+        "latitude", "longitude", "camera", "make", "model", "lens", "exif",
     ]
 
     static func stripJPEGAI(_ data: Data) throws -> StripResult {
@@ -85,7 +100,30 @@ private enum ScopedMetadataStripper {
             let payloadStart = index + 4
             let payload = Array(bytes[payloadStart..<end])
             let metadata = (marker >= 0xE0 && marker <= 0xEF) || marker == 0xFE
-            let shouldRemove = metadata && (marker == 0xEB || hasAIMarker(payload))
+            let shouldRemove: Bool
+            if !metadata {
+                shouldRemove = false
+            } else if marker == 0xEB && isC2PAPayload(payload) {
+                // JPEG APP11 is a C2PA carrier only when its ISO 19566
+                // fragmentation prefix or a readable C2PA marker is present;
+                // unrelated APP11 application data must remain untouched.
+                shouldRemove = true
+            } else if hasAIMarker(payload) {
+                if isMixedAIField(payload, marker: marker) {
+                    throw StripError.unsupported(
+                        "an AI marker shares this JPEG metadata block with unselected fields; the original is unchanged")
+                }
+                // EXIF is a shared camera/location carrier. Removing it as an
+                // AI side effect would violate the scoped operation, so require
+                // a future field-level EXIF rewrite instead.
+                if marker == 0xE1 && ascii(bytes, payloadStart, min(6, end - payloadStart)).hasPrefix("Exif") {
+                    throw StripError.unsupported(
+                        "AI data shares an EXIF camera/location carrier; field-level removal is not yet supported")
+                }
+                shouldRemove = true
+            } else {
+                shouldRemove = false
+            }
             if shouldRemove {
                 removed.append(jpegName(marker: marker, payload: payload))
             } else {
@@ -136,6 +174,7 @@ private enum ScopedMetadataStripper {
         var output = Data(bytes[0..<8])
         var removed: [String] = []
         var index = 8
+        var textBudget = PNGTextMetadata.maximumImageTextBytes
         while index + 12 <= bytes.count {
             let length = Int(bytes[index]) << 24 | Int(bytes[index + 1]) << 16 |
                 Int(bytes[index + 2]) << 8 | Int(bytes[index + 3])
@@ -146,9 +185,34 @@ private enum ScopedMetadataStripper {
             let payloadStart = index + 8
             let end = index + 12 + length
             let payload = Array(bytes[payloadStart..<(payloadStart + length)])
-            let remove = type == "caBX" ||
-                ((type == "tEXt" || type == "zTXt" || type == "iTXt" || type == "dSIG") &&
-                 hasAIMarker(payload))
+            let remove: Bool
+            if type == "caBX" {
+                remove = true
+            } else if type == "tEXt" || type == "zTXt" || type == "iTXt" {
+                let field: PNGTextMetadata.Field
+                do {
+                    field = try PNGTextMetadata.decode(type: type, payload: Data(payload),
+                                                       remainingBytes: &textBudget)
+                } catch {
+                    throw StripError.unsupported(
+                        "PNG text metadata could not be decoded safely; the original is unchanged")
+                }
+                guard field.isAIGeneration else {
+                    // Skip the generic byte-marker heuristic. The same bounded
+                    // decoder/classifier powers inspection and removal.
+                    output.append(contentsOf: bytes[index..<end])
+                    index = end
+                    continue
+                }
+                if !field.canRemoveWholeField &&
+                    containsProtectedMetadata(field.key + " " + field.text) {
+                    throw StripError.unsupported(
+                        "AI data shares a PNG text field with unselected fields; the original is unchanged")
+                }
+                remove = true
+            } else {
+                remove = type == "dSIG" && hasAIMarker(payload)
+            }
             if remove {
                 removed.append(pngName(type))
             } else {
@@ -173,6 +237,8 @@ private enum ScopedMetadataStripper {
         var kept: [[UInt8]] = []
         var removed: [String] = []
         var vp8xIndex = -1
+        var removedEXIF = false
+        var removedXMP = false
         var index = 12
         while index + 8 <= bytes.count {
             let fourCC = ascii(bytes, index, 4)
@@ -183,10 +249,22 @@ private enum ScopedMetadataStripper {
             }
             let end = index + 8 + size + (size & 1)
             let payload = Array(bytes[(index + 8)..<(index + 8 + size)])
-            let remove = fourCC == "C2PA" ||
-                ((fourCC == "XMP " || fourCC == "EXIF") && hasAIMarker(payload))
+            let remove: Bool
+            if fourCC == "C2PA" {
+                remove = true
+            } else if fourCC == "XMP " || fourCC == "EXIF", hasAIMarker(payload) {
+                if isMixedAIField(payload, marker: 0) || fourCC == "EXIF" {
+                    throw StripError.unsupported(
+                        "AI data shares this WebP metadata block with unselected fields; the original is unchanged")
+                }
+                remove = true
+            } else {
+                remove = false
+            }
             if remove {
                 removed.append(webPName(fourCC))
+                removedEXIF = removedEXIF || fourCC == "EXIF"
+                removedXMP = removedXMP || fourCC == "XMP "
             } else {
                 if fourCC == "VP8X" { vp8xIndex = kept.count }
                 kept.append(Array(bytes[index..<end]))
@@ -201,7 +279,8 @@ private enum ScopedMetadataStripper {
         // VP8X advertises optional EXIF/XMP chunks. Clear only those bits when
         // the corresponding chunks were removed; the image payload stays intact.
         if vp8xIndex >= 0, kept[vp8xIndex].count > 8 {
-            kept[vp8xIndex][8] &= ~UInt8(0x08) & ~UInt8(0x04)
+            if removedEXIF { kept[vp8xIndex][8] &= ~UInt8(0x08) }
+            if removedXMP { kept[vp8xIndex][8] &= ~UInt8(0x04) }
         }
         var body = Data()
         for chunk in kept { body.append(contentsOf: chunk) }
@@ -244,10 +323,10 @@ private enum ScopedMetadataStripper {
             copyOptions[kCGImageDestinationMetadata] = metadata
             copyOptions[kCGImageMetadataShouldExcludeGPS] = true
         case .exif:
-            copyOptions[kCGImagePropertyExifDictionary] = delete
-            copyOptions[kCGImagePropertyExifAuxDictionary] = delete
-            copyOptions[kCGImagePropertyTIFFDictionary] = delete
-            copyOptions[kCGImagePropertyMakerAppleDictionary] = delete
+            // Property-level kCFNull deletes are supplied to AddImageFromSource
+            // below. CopyImageSource treats those keys as destination options and
+            // rejects them, so do not build a misleading metadata dictionary here.
+            break
         case .aiMetadata:
             // ImageIO does not expose a portable XMP/C2PA deletion key on every
             // macOS-supported container. Remove the known metadata dictionaries
@@ -261,31 +340,117 @@ private enum ScopedMetadataStripper {
             return try MetadataStripper.strip(data)
         }
 
-        let frameCount = max(1, CGImageSourceGetCount(source))
+        let frameCount = CGImageSourceGetCount(source)
+        guard frameCount == 1 else {
+            throw StripError.unsupported(
+                "multi-frame/page cleaning is not yet verified without re-encoding; the original is unchanged")
+        }
         let output = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(output, uti, frameCount, nil) else {
             throw StripError.unreadable("no encoder available for this format")
         }
 
         var cfError: Unmanaged<CFError>?
-        let copied = CGImageDestinationCopyImageSource(destination, source,
+        let copied: Bool
+        if preset == .exif {
+            // AddImageFromSource accepts the property-level kCFNull deletes that
+            // CopyImageSource rejects. The encoded image payload is copied and
+            // the output is checked below before it is returned to the queue.
+            let delete: CFNull = kCFNull
+            let properties: [CFString: Any] = [
+                kCGImagePropertyExifDictionary: delete,
+                kCGImagePropertyExifAuxDictionary: delete,
+                kCGImagePropertyTIFFDictionary: [
+                    kCGImagePropertyTIFFMake: delete,
+                    kCGImagePropertyTIFFModel: delete,
+                    kCGImagePropertyTIFFSoftware: delete,
+                ],
+                kCGImagePropertyMakerAppleDictionary: delete,
+            ]
+            CGImageDestinationAddImageFromSource(destination, source, 0,
+                                                  properties as CFDictionary)
+            copied = CGImageDestinationFinalize(destination)
+        } else {
+            copied = CGImageDestinationCopyImageSource(destination, source,
                                                         copyOptions as CFDictionary, &cfError)
+        }
         guard copied, output.length > 0 else {
             let why = cfError?.takeRetainedValue().localizedDescription ?? "the encoder rejected the copy"
             throw StripError.unreadable(why)
         }
 
         let resultData = output as Data
+        guard let copiedSource = CGImageSourceCreateWithData(resultData as CFData, nil) else {
+            throw StripError.unsupported("image structure could not be preserved without re-encoding")
+        }
+        guard CGImageSourceGetType(copiedSource) as String? == uti as String,
+              CGImageSourceGetCount(copiedSource) == frameCount,
+              let beforeProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil)
+                as? [CFString: Any],
+              let afterProperties = CGImageSourceCopyPropertiesAtIndex(copiedSource, 0, nil)
+                as? [CFString: Any] else {
+            throw StripError.unsupported("image structure could not be preserved without re-encoding")
+        }
+        guard sameRenderingProperties(beforeProperties, afterProperties) else {
+            throw StripError.unsupported("image rendering properties changed without re-encoding")
+        }
+        guard decodedPixels(source) == decodedPixels(copiedSource) else {
+            throw StripError.unsupported("decoded image samples changed without re-encoding")
+        }
         let removed = labelsRemoved(from: before, preset: preset)
         return StripResult(data: resultData,
                            removed: removed,
                            format: MetadataStripper.detect(resultData),
-                           lossless: true)
+                           lossless: true,
+                           preserved: ["ImageIO metadata-only copy; no re-encoding"])
     }
 
     private static func hasAIMarker(_ bytes: [UInt8]) -> Bool {
         let text = String(decoding: bytes, as: UTF8.self).lowercased()
-        return aiMarkers.contains { text.contains($0) }
+        return MetadataTextClassifier.isAIGeneration(key: "", value: text) ||
+            aiMarkers.contains { text.contains($0) }
+    }
+
+    private static func sameRenderingProperties(_ before: [CFString: Any],
+                                                _ after: [CFString: Any]) -> Bool {
+        for key in [kCGImagePropertyPixelWidth, kCGImagePropertyPixelHeight,
+                    kCGImagePropertyDepth, kCGImagePropertyColorModel,
+                    kCGImagePropertyProfileName] {
+            if before[key].map({ String(describing: $0) }) != after[key].map({ String(describing: $0) }) {
+                return false
+            }
+        }
+        let beforeOrientation = (before[kCGImagePropertyOrientation] as? Int) ??
+            (before[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        let afterOrientation = (after[kCGImagePropertyOrientation] as? Int) ??
+            (after[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        return beforeOrientation == afterOrientation
+    }
+
+    private static func decodedPixels(_ source: CGImageSource) -> Data? {
+        guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
+              let provider = image.dataProvider,
+              let data = provider.data else { return nil }
+        return data as Data
+    }
+
+    private static func isC2PAPayload(_ bytes: [UInt8]) -> Bool {
+        (bytes.count >= 2 && bytes[0] == 0x4A && bytes[1] == 0x50) ||
+            String(decoding: bytes, as: UTF8.self).lowercased().contains("c2pa")
+    }
+
+    private static func isMixedAIField(_ bytes: [UInt8], marker: UInt8) -> Bool {
+        let text = String(decoding: bytes, as: UTF8.self).lowercased()
+        // APP1/XMP may have a binary preamble; the textual check is deliberately
+        // conservative. A marker in a protected field is never deleted wholesale.
+        return containsProtectedMetadata(text) ||
+            (marker == 0xE1 && (text.contains("xmpmeta") || text.contains("rdf:")) &&
+             containsProtectedMetadata(text))
+    }
+
+    private static func containsProtectedMetadata(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        return protectedMarkers.contains(where: lower.contains)
     }
 
     private static func ascii(_ bytes: [UInt8], _ start: Int, _ length: Int) -> String {

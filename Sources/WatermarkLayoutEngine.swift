@@ -9,6 +9,31 @@ enum WatermarkKind: String, CaseIterable, Identifiable, Codable, Equatable, Send
 
 enum WatermarkDefaults {
     static let rotationDegrees = 0.0
+    static let textAppearance = WatermarkAppearance(opacity: 0.45, rotation: 0,
+        scalePercent: 8, position: .bottomRight, marginPercent: 2.5)
+    static let logoAppearance = WatermarkAppearance(opacity: 0.90, rotation: 0,
+        scalePercent: 40, position: .centre, marginPercent: 2.5)
+}
+
+struct WatermarkAppearance: Equatable, Sendable {
+    var opacity: Double
+    var rotation: Double
+    var scalePercent: Double
+    var position: WatermarkPosition
+    var marginPercent: Double
+}
+
+/// Session-only settings per kind. Switching back restores edits; saved presets
+/// still take precedence when explicitly applied. Never stores logo bytes or paths.
+struct WatermarkAppearanceProfiles {
+    private var text = WatermarkDefaults.textAppearance
+    private var logo = WatermarkDefaults.logoAppearance
+
+    mutating func switching(from previous: WatermarkKind, to next: WatermarkKind,
+                            current: WatermarkAppearance) -> WatermarkAppearance {
+        if previous == .text { text = current } else { logo = current }
+        return next == .text ? text : logo
+    }
 }
 
 enum WatermarkPosition: String, CaseIterable, Identifiable, Codable, Equatable, Sendable {

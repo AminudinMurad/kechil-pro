@@ -15,7 +15,11 @@ struct InspectorPanel: View {
                 placeholder
             }
         }
-        .frame(minWidth: 240, idealWidth: 280, maxWidth: 380, maxHeight: .infinity)
+        // The parent workspace owns the horizontal split. Keeping this pane free
+        // of an intrinsic maximum lets Image Clean resize just like Video Clean:
+        // the queue keeps its readable minimum while the inspector can take the
+        // remaining width (or be resized by dragging the split divider).
+        .frame(maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
     }
 
@@ -37,6 +41,12 @@ struct InspectorPanel: View {
                         .foregroundStyle(.secondary)
                 }
 
+                MediaSizeEstimateCard(
+                    title: "Clean output estimate",
+                    estimate: model.sizeEstimateItemID == item.id ? model.sizeEstimate : nil,
+                    isEstimating: model.sizeEstimateItemID == item.id && model.isEstimatingSize,
+                    error: model.sizeEstimateItemID == item.id ? model.sizeEstimateError : nil)
+
                 losslessBadge(for: item)
                 Divider()
                 findings(for: item)
@@ -48,9 +58,12 @@ struct InspectorPanel: View {
                         .foregroundStyle(.green)
                         .lineLimit(2)
                         .truncationMode(.middle)
-                } else if item.cleanedData != nil {
-                    Button("Save Clean Copy…") { model.save(item: item) }
-                        .buttonStyle(.borderedProminent)
+                } else if item.isSaveReady {
+                    Button(item.isUnchangedCopy ? "Save Unchanged Copy…" : "Save Clean Copy…") {
+                        model.save(item: item)
+                    }
+                        .buttonStyle(KechilSaveButtonStyle())
+                        .controlSize(.regular)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -90,7 +103,16 @@ struct InspectorPanel: View {
     /// re-encode fallback has to say so.
     @ViewBuilder
     private func losslessBadge(for item: ScrubItem) -> some View {
-        if item.errorText == nil {
+        if item.stage == .queued || item.stage == .analysing || item.stage == .cancelling {
+            Label(item.statusText ?? item.stage.cleanLabel,
+                  systemImage: "doc.text.magnifyingglass")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+        } else if item.stage == .ready {
+            Label("Inspected only — original unchanged", systemImage: "eye.fill")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+        } else if item.errorText == nil, item.hasPreparedOutput || item.stage == .saved {
             if item.lossless {
                 Label("Lossless — pixels untouched", systemImage: "checkmark.seal.fill")
                     .font(.system(size: 11, weight: .medium))
@@ -118,6 +140,10 @@ struct InspectorPanel: View {
             VStack(alignment: .leading, spacing: 13) {
                 if let ai = item.provenance.generativeFinding {
                     aiBanner(ai)
+                }
+
+                if item.stage == .ready, let plan = item.plan {
+                    reviewPlan(plan, preset: item.preset)
                 }
 
                 if item.provenance.carriers.isEmpty && item.provenance.findings.isEmpty &&
@@ -149,6 +175,17 @@ struct InspectorPanel: View {
                     }
                 }
 
+                if !item.preserved.isEmpty {
+                    detailSection(title: "Kept for correct display", symbol: "photo") {
+                        ForEach(item.preserved, id: \.self) { note in
+                            Text(note)
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+
                 if !item.removed.isEmpty {
                     detailSection(title: "Removed", symbol: "trash.slash.fill", tone: .action) {
                         // Already in fixed order, so GPS leads whenever it is present.
@@ -176,7 +213,9 @@ struct InspectorPanel: View {
                     }
                 }
 
-                verificationSection(item)
+                if item.outputProvenance != nil {
+                    verificationSection(item)
+                }
 
                 detailSection(title: "Still present",
                               symbol: "exclamationmark.shield.fill",
@@ -199,6 +238,22 @@ struct InspectorPanel: View {
                     }
                 }
             }
+        }
+    }
+
+    private func reviewPlan(_ plan: CleanPlanSummary, preset: CleanPreset) -> some View {
+        detailSection(title: "Planned cleanup",
+                      symbol: plan.hasRequestedChanges ? "list.bullet.clipboard" : "doc.on.doc",
+                      tone: .action) {
+            Label(preset.title, systemImage: preset.symbolName)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+            Text(plan.hasRequestedChanges
+                 ? "This inspected source matches the selected scope. No output exists yet; choose Clean Selected to create and verify a new copy."
+                 : "No matching metadata was found for this scope. Clean Selected will only prepare an explicitly labelled unchanged copy.")
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

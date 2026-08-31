@@ -34,7 +34,14 @@ struct TransformItem: Identifiable {
 @MainActor
 final class TransformModel: ObservableObject {
     @Published var items: [TransformItem] = []
-    @Published var selectedItemID: UUID?
+    @Published var selectedItemID: UUID? {
+        didSet {
+            guard !selectionMutationInProgress else { return }
+            selectedItemIDs = selectedItemID.map { [$0] } ?? []
+            selectionAnchorID = selectedItemID
+        }
+    }
+    @Published private(set) var selectedItemIDs: Set<UUID> = []
     @Published var isProcessing = false
     @Published var statusMessage: String?
     @Published var watermarkPreview: NSImage?
@@ -52,6 +59,13 @@ final class TransformModel: ObservableObject {
     @Published private(set) var optimizePreviewStatus: String?
     @Published private(set) var optimizePreviewError: String?
     @Published private(set) var isOptimizePreviewRendering = false
+    /// Live size for the selected image using the full Watermark image encoder.
+    /// It is intentionally separate from queue output so changing a control
+    /// never silently replaces an already prepared result.
+    @Published private(set) var watermarkSizeEstimate: MediaSizeEstimate?
+    @Published private(set) var watermarkSizeEstimateItemID: UUID?
+    @Published private(set) var isWatermarkSizeEstimating = false
+    @Published private(set) var watermarkSizeEstimateError: String?
 
     // These values form a snapshot when processing begins. Changing a control never
     // silently changes an already-rendered image; the user must choose Apply again.
@@ -60,16 +74,51 @@ final class TransformModel: ObservableObject {
     @Published var cropFocusY = 0.5
     @Published var cropWidth = 0.0
     @Published var cropHeight = 0.0
+    /// Controls whether a custom crop may enlarge a smaller queued source before
+    /// cropping. This is intentionally independent from Resize's output policy.
+    @Published var cropUpscalePolicy: ImageCropUpscalePolicy = .keepNative
     @Published var resizeMode: ResizeMode = .none
     @Published var resizeValue = 100.0
-    @Published var dontUpscale = true
+    /// A positive, plain-language setting that maps directly to the visible checkbox.
+    @Published var allowsUpscaling = ImageResizePolicy.allowsUpscalingByDefault
+    /// Custom crop sizes remain independent unless the user explicitly links them.
+    @Published var locksCustomCropAspect = false {
+        didSet {
+            if locksCustomCropAspect && !oldValue {
+                // Capture once. Browsing another image must not change the batch ratio.
+                if let width = selectedItem?.sourceWidth,
+                   let height = selectedItem?.sourceHeight, width > 0, height > 0 {
+                    linkedCropRatio = Double(width) / Double(height)
+                } else if let target = customCropTargetSize {
+                    linkedCropRatio = Double(target.width / target.height)
+                }
+                setCropDimension(isWidth: true, value: cropWidth)
+            } else if !locksCustomCropAspect {
+                linkedCropRatio = nil
+            }
+        }
+    }
+    private var linkedCropRatio: Double?
     @Published var outputFormat: ImageOutputFormat = .webp
     @Published var qualityFloor = 60.0
     @Published var qualityCeiling = 82.0
     @Published var targetKilobytes = 0.0
     @Published var webPLossless = false
     @Published var webPMethod = 4.0
-    @Published var watermarkKind: WatermarkKind = .text
+    @Published var watermarkKind: WatermarkKind = .text {
+        didSet {
+            guard watermarkKind != oldValue else { return }
+            let next = watermarkAppearances.switching(from: oldValue, to: watermarkKind,
+                current: WatermarkAppearance(opacity: watermarkOpacity, rotation: watermarkRotation,
+                    scalePercent: watermarkScalePercent, position: watermarkPosition,
+                    marginPercent: watermarkMarginPercent))
+            watermarkOpacity = next.opacity
+            watermarkRotation = next.rotation
+            watermarkScalePercent = next.scalePercent
+            watermarkPosition = next.position
+            watermarkMarginPercent = next.marginPercent
+        }
+    }
     @Published var watermarkText = "© Kechil PRO"
     @Published var watermarkLogoData: Data?
     @Published var watermarkLogoName: String?
@@ -87,9 +136,14 @@ final class TransformModel: ObservableObject {
     @Published var selectedWatermarkPreset = ""
 
     private let watermarkMode: Bool
+    private var watermarkAppearances = WatermarkAppearanceProfiles()
     private var watermarkPreviewTask: Task<Void, Never>?
     private var optimizePreviewTask: Task<Void, Never>?
     private var optimizePreviewGeneration = 0
+    private var watermarkSizeEstimateTask: Task<Void, Never>?
+    private var watermarkSizeEstimateGeneration = 0
+    private var selectionAnchorID: UUID?
+    private var selectionMutationInProgress = false
     private static let watermarkPresetKey = "kechil.watermarkPresets.v1"
 
     private let acceptedExtensions: Set<String> = [
@@ -100,8 +154,146 @@ final class TransformModel: ObservableObject {
     var completedCount: Int { items.filter { $0.outputData != nil }.count }
     var pendingCount: Int { items.filter { $0.outputData == nil && $0.savedTo == nil }.count }
     var selectedItem: TransformItem? {
-        guard let selectedItemID else { return items.first }
+        guard let selectedItemID else { return nil }
         return items.first { $0.id == selectedItemID }
+    }
+
+    var selectedIDs: Set<UUID> {
+        let validIDs = Set(items.map(\.id))
+        let current = selectedItemIDs.intersection(validIDs)
+        if !current.isEmpty { return current }
+        if let selectedItemID, validIDs.contains(selectedItemID) { return [selectedItemID] }
+        return []
+    }
+
+    var selectedItems: [TransformItem] {
+        let ids = selectedIDs
+        return items.filter { ids.contains($0.id) }
+    }
+
+    var selectedItemCount: Int { selectedIDs.count }
+    var selectedSaveItems: [TransformItem] { selectedItems.filter { $0.outputData != nil } }
+    var selectedSaveCount: Int { selectedSaveItems.count }
+    func isSelected(_ item: TransformItem) -> Bool { selectedIDs.contains(item.id) }
+
+    private func setSelection(_ ids: Set<UUID>, primary: UUID?) {
+        selectionMutationInProgress = true
+        selectedItemIDs = ids
+        selectedItemID = primary
+        selectionMutationInProgress = false
+        selectionAnchorID = primary
+    }
+
+    /// A compact value used by the view to invalidate the estimate whenever a
+    /// watermark or output control changes. Logo data itself is observed by the
+    /// dedicated published property; the name and byte count make the key useful
+    /// for a changed logo as well.
+    var watermarkEstimateSettingsKey: String {
+        [
+            watermarkKind.rawValue, watermarkText, watermarkLogoName ?? "",
+            "\(watermarkLogoData?.count ?? 0)",
+            String(format: "%.4f", watermarkOpacity),
+            String(format: "%.2f", watermarkRotation),
+            String(format: "%.2f", watermarkScalePercent),
+            watermarkPosition.rawValue, "\(watermarkTiled)",
+            String(format: "%.4f", watermarkTextColor.red),
+            String(format: "%.4f", watermarkTextColor.green),
+            String(format: "%.4f", watermarkTextColor.blue),
+            String(format: "%.4f", watermarkTextColor.alpha),
+            String(format: "%.4f", watermarkMarginPercent),
+            String(format: "%.4f", watermarkTileGapPercent),
+            "\(watermarkShadowEnabled)",
+            String(format: "%.4f", watermarkShadowOpacity),
+            outputFormat.rawValue, "\(webPLossless)",
+            String(format: "%.2f", qualityFloor),
+            String(format: "%.2f", qualityCeiling),
+            String(format: "%.2f", targetKilobytes),
+            String(format: "%.2f", webPMethod),
+        ].joined(separator: "|")
+    }
+
+    /// The requested custom crop target, normalized the same way as the geometry
+    /// contract. Unlike the old selected-source clamp, this remains stable across a
+    /// batch so one small image cannot silently change the target for every image.
+    var customCropTargetSize: CGSize? {
+        guard cropAspect == .custom,
+              cropWidth.isFinite, cropHeight.isFinite,
+              cropWidth > 0, cropHeight > 0 else { return nil }
+        return CGSize(width: max(1, cropWidth.rounded()),
+                      height: max(1, cropHeight.rounded()))
+    }
+
+    /// Number of queued images for which source dimensions are available. This is
+    /// kept separate from `knownSmallerCropCount` so the UI can distinguish “none
+    /// are smaller” from “dimensions are still being read”.
+    var knownCropSourceCount: Int {
+        items.filter { item in
+            guard let width = item.sourceWidth, let height = item.sourceHeight else {
+                return false
+            }
+            return width > 0 && height > 0
+        }.count
+    }
+
+    /// Number of known source images that cannot cover the requested custom crop
+    /// without enlargement in at least one dimension.
+    var knownSmallerCropCount: Int {
+        guard let target = customCropTargetSize else { return 0 }
+        return items.filter { item in
+            guard let width = item.sourceWidth, let height = item.sourceHeight,
+                  width > 0, height > 0 else { return false }
+            return CGFloat(width) < target.width || CGFloat(height) < target.height
+        }.count
+    }
+
+    func setCropDimension(isWidth: Bool, value: Double) {
+        guard value.isFinite, value > 0 else { return }
+        let dimension = max(1, value.rounded())
+        if isWidth { cropWidth = dimension } else { cropHeight = dimension }
+        guard locksCustomCropAspect else { return }
+        if linkedCropRatio == nil, let target = customCropTargetSize {
+            linkedCropRatio = Double(target.width / target.height)
+        }
+        guard let ratio = linkedCropRatio, ratio.isFinite, ratio > 0 else { return }
+        if isWidth { cropHeight = max(1, (dimension / ratio).rounded()) }
+        else { cropWidth = max(1, (dimension * ratio).rounded()) }
+    }
+
+    var batchCropImpactSummary: String {
+        guard customCropTargetSize != nil else { return "" }
+        guard !items.isEmpty else { return "Add images to see batch impact." }
+        let known = knownCropSourceCount
+        let smaller = knownSmallerCropCount
+        let unknown = items.count - known
+        var summary: String
+        if known == 0 {
+            summary = "Source dimensions are not available yet."
+        } else if smaller == 0 {
+            summary = "All \(known) checked images cover the crop target."
+        } else {
+            let outcome = cropUpscalePolicy == .fillTarget
+                ? "will be enlarged before crop" : "will keep a smaller crop"
+            summary = "\(smaller) of \(known) checked images \(outcome)."
+        }
+        if unknown > 0 && known > 0 {
+            summary += " \(unknown) source sizes unavailable."
+        }
+        return summary
+    }
+
+    /// A prediction for the current controls, never a claim about an existing export.
+    func cropPrediction(for item: TransformItem) -> String? {
+        guard let target = customCropTargetSize,
+              let width = item.sourceWidth, let height = item.sourceHeight,
+              width > 0, height > 0 else { return nil }
+        let source = CGSize(width: width, height: height)
+        let crop = ImageCropGeometry.cropSize(source: source, aspect: nil,
+            customSize: target, cropUpscalePolicy: cropUpscalePolicy)
+        let scale = ImageCropGeometry.cropUpscaleScale(source: source,
+            customSize: target, policy: cropUpscalePolicy)
+        let action = scale > 1 ? String(format: "enlarge %.2f×", Double(scale))
+            : (crop.width < target.width || crop.height < target.height ? "below target" : "native pixels")
+        return "Next crop: \(Int(crop.width)) × \(Int(crop.height)) · \(action)"
     }
 
     init(watermarkMode: Bool = false) {
@@ -122,7 +314,12 @@ final class TransformModel: ObservableObject {
             // produce both source and output thumbnails from its single source read.
             let newItems = await Task.detached(priority: .userInitiated) {
                 Self.expand(urls: urls, acceptedExtensions: extensions).map { url in
-                    TransformItem(sourceURL: url, originalSize: Self.fileSize(of: url))
+                    var item = TransformItem(sourceURL: url, originalSize: Self.fileSize(of: url))
+                    if let dimensions = Self.pixelSize(of: url) {
+                        item.sourceWidth = dimensions.width
+                        item.sourceHeight = dimensions.height
+                    }
+                    return item
                 }
             }.value
 
@@ -132,15 +329,54 @@ final class TransformModel: ObservableObject {
                 return
             }
             self.items.append(contentsOf: newItems)
-            if self.selectedItemID == nil { self.selectedItemID = newItems.first?.id }
+            if self.selectedItemID == nil, let first = newItems.first { self.select(first) }
             if self.watermarkMode { self.refreshWatermarkPreview() }
             self.process(itemIDs: Set(newItems.map(\.id)))
         }
     }
 
     func reprocessAll() {
-        guard !items.isEmpty else { return }
+        guard canProcessAll else { return }
         process(itemIDs: Set(items.map(\.id)))
+    }
+
+    var canProcessAll: Bool {
+        !items.isEmpty && !isProcessing &&
+            (!watermarkMode || watermarkKind != .logo || watermarkLogoData != nil)
+    }
+
+    var canProcessSelected: Bool {
+        canProcessAll && !selectedItems.isEmpty
+    }
+
+    func reprocessSelected() {
+        guard canProcessSelected else { return }
+        process(itemIDs: selectedIDs)
+    }
+
+    var canSaveSelected: Bool {
+        !isProcessing && !selectedSaveItems.isEmpty
+    }
+
+    func saveSelected() {
+        let pending = selectedSaveItems
+        guard canSaveSelected else { return }
+        if selectedItemCount == 1, let item = pending.first {
+            save(item: item)
+            return
+        }
+        guard let folder = BatchSaveFolderChooser.choose(
+            defaultDirectory: AppSettings.shared.defaultSaveDirectory,
+            message: "Choose a folder for \(pending.count) selected image\(pending.count == 1 ? "" : "s")") else { return }
+        var saved = 0
+        for item in pending {
+            guard let data = item.outputData else { continue }
+            let destination = uniqueURL(in: folder,
+                                        filename: item.suggestedFilename(
+                                            extension: (item.outputFormat ?? outputFormat).fileExtension))
+            if write(data, to: destination, itemID: item.id) { saved += 1 }
+        }
+        statusMessage = "Saved \(saved) selected image\(saved == 1 ? "" : "s") to \(folder.lastPathComponent)."
     }
 
     func chooseFiles() {
@@ -244,28 +480,59 @@ final class TransformModel: ObservableObject {
     func clear() {
         watermarkPreviewTask?.cancel()
         optimizePreviewTask?.cancel()
+        watermarkSizeEstimateTask?.cancel()
         optimizePreviewGeneration &+= 1
+        watermarkSizeEstimateGeneration &+= 1
         items.removeAll()
-        selectedItemID = nil
+        setSelection([], primary: nil)
         watermarkPreview = nil
         watermarkPreviewError = nil
+        watermarkSizeEstimate = nil
+        watermarkSizeEstimateItemID = nil
+        watermarkSizeEstimateError = nil
+        isWatermarkSizeEstimating = false
         clearOptimizePreview()
         statusMessage = nil
     }
 
     func remove(item: TransformItem) {
         items.removeAll { $0.id == item.id }
-        if selectedItemID == item.id {
-            selectedItemID = items.first?.id
-            clearOptimizePreview()
+        let retained = selectedIDs.subtracting([item.id]).intersection(Set(items.map(\.id)))
+        if retained.isEmpty {
+            let next = items.first?.id
+            setSelection(next.map { [$0] } ?? [], primary: next)
+        } else {
+            setSelection(retained,
+                         primary: MediaSelection.primaryID(for: retained,
+                                                           preferredID: selectedItemID,
+                                                           orderedIDs: items.map(\.id)))
         }
-        if watermarkMode { refreshWatermarkPreview() }
+        clearOptimizePreview()
+        if watermarkMode {
+            refreshWatermarkPreview()
+            refreshWatermarkSizeEstimate()
+        }
     }
 
     func select(_ item: TransformItem) {
-        selectedItemID = item.id
+        select(item, modifiers: [])
+    }
+
+    func select(_ item: TransformItem, modifiers: NSEvent.ModifierFlags) {
+        let orderedIDs = items.map(\.id)
+        let result = MediaSelection.update(current: selectedIDs,
+                                           anchorID: selectionAnchorID,
+                                           tappedID: item.id,
+                                           orderedIDs: orderedIDs,
+                                           modifiers: modifiers)
+        setSelection(result.ids,
+                     primary: MediaSelection.primaryID(for: result.ids,
+                                                       preferredID: item.id,
+                                                       orderedIDs: orderedIDs))
+        selectionAnchorID = result.anchorID
         if watermarkMode {
             refreshWatermarkPreview()
+            refreshWatermarkSizeEstimate()
         } else {
             // A preview belongs to one source and one settings snapshot. Do not show
             // the previous selection while the new selection is being inspected.
@@ -376,6 +643,62 @@ final class TransformModel: ObservableObject {
         }
     }
 
+    /// Performs a complete image render and encode with the current Watermark
+    /// settings. The output bytes are discarded after the measurement; the
+    /// queue is not changed until the user chooses Watermark Selected or All.
+    func refreshWatermarkSizeEstimate() {
+        guard watermarkMode else { return }
+        watermarkSizeEstimateTask?.cancel()
+        watermarkSizeEstimateGeneration &+= 1
+        let generation = watermarkSizeEstimateGeneration
+        guard let selected = selectedItem else {
+            watermarkSizeEstimate = nil
+            watermarkSizeEstimateItemID = nil
+            watermarkSizeEstimateError = nil
+            isWatermarkSizeEstimating = false
+            return
+        }
+
+        let settings = snapshot
+        watermarkSizeEstimateItemID = selected.id
+        watermarkSizeEstimate = nil
+        watermarkSizeEstimateError = nil
+        isWatermarkSizeEstimating = true
+        let itemID = selected.id
+        watermarkSizeEstimateTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 180_000_000)
+                try Task.checkCancellation()
+                let estimate = try await Task.detached(priority: .userInitiated) {
+                    let source = try Data(contentsOf: selected.sourceURL, options: .mappedIfSafe)
+                    let output = try TransformPipeline.process(source, settings: settings)
+                    try Task.checkCancellation()
+                    return MediaSizeEstimate(
+                        sourceBytes: Int64(source.count),
+                        estimatedBytes: Int64(output.data.count),
+                        basis: .fullImageEncode,
+                        detail: "Measured by fully encoding the selected image with the current Watermark settings; it is not saved yet.")
+                }.value
+                try Task.checkCancellation()
+                guard let self,
+                      self.watermarkSizeEstimateGeneration == generation,
+                      self.selectedItemID == itemID else { return }
+                self.watermarkSizeEstimate = estimate
+                self.watermarkSizeEstimateError = nil
+                self.isWatermarkSizeEstimating = false
+            } catch is CancellationError {
+                // A newer selection or setting owns the next measurement.
+            } catch {
+                guard let self,
+                      self.watermarkSizeEstimateGeneration == generation,
+                      self.selectedItemID == itemID else { return }
+                self.watermarkSizeEstimate = nil
+                self.watermarkSizeEstimateError = error.localizedDescription
+                self.isWatermarkSizeEstimating = false
+            }
+        }
+    }
+
     var watermarkConfiguration: WatermarkConfiguration {
         WatermarkConfiguration(source: watermarkKind == .text ? .text(watermarkText) : .logo,
                                textColor: watermarkTextColor,
@@ -439,6 +762,7 @@ final class TransformModel: ObservableObject {
         let queued = items.filter { itemIDs.contains($0.id) }
         guard !queued.isEmpty else { return }
         let settings = snapshot
+        let watermarkEstimateKey = watermarkMode ? watermarkEstimateSettingsKey : ""
         isProcessing = true
         statusMessage = "Processing \(queued.count) image\(queued.count == 1 ? "" : "s")…"
 
@@ -450,6 +774,19 @@ final class TransformModel: ObservableObject {
                 let result = await Self.process(item: item, settings: settings)
                 guard let index = self.items.firstIndex(where: { $0.id == result.id }) else { continue }
                 self.items[index] = result
+                if self.watermarkMode,
+                   result.id == self.selectedItemID,
+                   self.watermarkEstimateSettingsKey == watermarkEstimateKey,
+                   let outputSize = result.outputSize {
+                    self.watermarkSizeEstimateItemID = result.id
+                    self.watermarkSizeEstimate = MediaSizeEstimate(
+                        sourceBytes: Int64(result.originalSize),
+                        estimatedBytes: Int64(outputSize),
+                        basis: .actualOutput,
+                        detail: "Measured prepared output from the current Watermark operation.")
+                    self.watermarkSizeEstimateError = nil
+                    self.isWatermarkSizeEstimating = false
+                }
             }
             self.isProcessing = false
             let successes = queued.filter { id in
@@ -463,8 +800,9 @@ final class TransformModel: ObservableObject {
         TransformSettingsSnapshot(cropAspect: cropAspect,
                                   cropFocusX: cropFocusX, cropFocusY: cropFocusY,
                                   cropWidth: cropWidth, cropHeight: cropHeight,
+                                  cropUpscalePolicy: cropUpscalePolicy,
                                   resizeMode: resizeMode, resizeValue: resizeValue,
-                                  dontUpscale: dontUpscale,
+                                  allowsUpscaling: allowsUpscaling,
                                   outputFormat: outputFormat,
                                   qualityFloor: Int(qualityFloor.rounded()),
                                   qualityCeiling: Int(qualityCeiling.rounded()),
@@ -557,6 +895,17 @@ final class TransformModel: ObservableObject {
 
     nonisolated private static func fileSize(of url: URL) -> Int {
         (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+    }
+
+    nonisolated private static func pixelSize(of url: URL) -> (width: Int, height: Int)? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as NSDictionary?,
+              let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+              let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue,
+              width > 0, height > 0 else { return nil }
+        let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        let swapsAxes = (5...8).contains(orientation)
+        return swapsAxes ? (height, width) : (width, height)
     }
 
     @discardableResult
