@@ -25,9 +25,14 @@ struct TransformItem: Identifiable {
 
     var displayName: String { sourceURL.lastPathComponent }
 
-    func suggestedFilename(extension outputExtension: String) -> String {
-        let base = sourceURL.deletingPathExtension().lastPathComponent
-        return "\(base)-kechil.\(outputExtension)"
+    func suggestedFilename(extension outputExtension: String,
+                           appendage: String = ConvertedFilenameNaming.defaultAppendage,
+                           includeResolution: Bool = false) -> String {
+        ConvertedFilenameNaming.filename(sourceURL: sourceURL,
+                                          outputExtension: outputExtension,
+                                          appendage: appendage,
+                                          includeResolution: includeResolution,
+                                          width: width, height: height)
     }
 }
 
@@ -86,6 +91,10 @@ final class TransformModel: ObservableObject {
     @Published var cropUpscalePolicy: ImageCropUpscalePolicy = .keepNative
     @Published var resizeMode: ResizeMode = .none
     @Published var resizeValue = 100.0
+    @Published var resizeWidth = 0.0
+    @Published var resizeHeight = 0.0
+    @Published private(set) var locksResizeAspect = true
+    private var linkedResizeRatio: Double?
     /// A positive, plain-language setting that maps directly to the visible checkbox.
     @Published var allowsUpscaling = ImageResizePolicy.allowsUpscalingByDefault
     /// Custom crop sizes remain independent unless the user explicitly links them.
@@ -266,6 +275,40 @@ final class TransformModel: ObservableObject {
         else { cropWidth = max(1, (dimension * ratio).rounded()) }
     }
 
+    func seedResizeDimensions(width: Double, height: Double) {
+        guard width.isFinite, height.isFinite, width > 0, height > 0 else { return }
+        resizeWidth = max(1, width.rounded())
+        resizeHeight = max(1, height.rounded())
+        if locksResizeAspect { linkedResizeRatio = resizeWidth / resizeHeight }
+    }
+
+    func setResizeAspectLock(_ locked: Bool, sourceRatio: Double?) {
+        locksResizeAspect = locked
+        guard locked else {
+            linkedResizeRatio = nil
+            return
+        }
+        if let sourceRatio, sourceRatio.isFinite, sourceRatio > 0 {
+            linkedResizeRatio = sourceRatio
+        } else if resizeWidth > 0, resizeHeight > 0 {
+            linkedResizeRatio = resizeWidth / resizeHeight
+        }
+        setResizeDimension(isWidth: true, value: resizeWidth)
+    }
+
+    func setResizeDimension(isWidth: Bool, value: Double) {
+        guard value.isFinite, value > 0 else { return }
+        let dimension = max(1, value.rounded())
+        if isWidth { resizeWidth = dimension } else { resizeHeight = dimension }
+        guard locksResizeAspect else { return }
+        if linkedResizeRatio == nil, resizeWidth > 0, resizeHeight > 0 {
+            linkedResizeRatio = resizeWidth / resizeHeight
+        }
+        guard let ratio = linkedResizeRatio, ratio.isFinite, ratio > 0 else { return }
+        if isWidth { resizeHeight = max(1, (dimension / ratio).rounded()) }
+        else { resizeWidth = max(1, (dimension * ratio).rounded()) }
+    }
+
     var batchCropImpactSummary: String {
         guard customCropTargetSize != nil else { return "" }
         guard !items.isEmpty else { return "Add images to see batch impact." }
@@ -380,7 +423,9 @@ final class TransformModel: ObservableObject {
             guard let data = item.outputData else { continue }
             let destination = uniqueURL(in: folder,
                                         filename: item.suggestedFilename(
-                                            extension: (item.outputFormat ?? outputFormat).fileExtension))
+                                            extension: (item.outputFormat ?? outputFormat).fileExtension,
+                                            appendage: AppSettings.shared.effectiveConvertedFilenameAppendage,
+                                            includeResolution: AppSettings.shared.appendsResolutionToConvertedFilenames))
             if write(data, to: destination, itemID: item.id) { saved += 1 }
         }
         statusMessage = "Saved \(saved) selected image\(saved == 1 ? "" : "s") to \(folder.lastPathComponent)."
@@ -746,7 +791,9 @@ final class TransformModel: ObservableObject {
         guard let data = item.outputData else { return }
         let panel = NSSavePanel()
         panel.nameFieldStringValue = item.suggestedFilename(
-            extension: (item.outputFormat ?? outputFormat).fileExtension)
+            extension: (item.outputFormat ?? outputFormat).fileExtension,
+            appendage: AppSettings.shared.effectiveConvertedFilenameAppendage,
+            includeResolution: AppSettings.shared.appendsResolutionToConvertedFilenames)
         panel.directoryURL = AppSettings.shared.defaultSaveDirectory
         panel.canCreateDirectories = true
         panel.message = "Save the converted copy of \(item.displayName)"
@@ -777,7 +824,9 @@ final class TransformModel: ObservableObject {
             guard let data = item.outputData else { continue }
             let url = uniqueURL(in: folder,
                                 filename: item.suggestedFilename(
-                                    extension: (item.outputFormat ?? outputFormat).fileExtension))
+                                    extension: (item.outputFormat ?? outputFormat).fileExtension,
+                                    appendage: AppSettings.shared.effectiveConvertedFilenameAppendage,
+                                    includeResolution: AppSettings.shared.appendsResolutionToConvertedFilenames))
             if write(data, to: url, itemID: item.id) { written += 1 }
         }
         statusMessage = "Saved \(written) image\(written == 1 ? "" : "s") to \(folder.lastPathComponent)."
@@ -831,6 +880,7 @@ final class TransformModel: ObservableObject {
                                   cropWidth: cropWidth, cropHeight: cropHeight,
                                   cropUpscalePolicy: cropUpscalePolicy,
                                   resizeMode: resizeMode, resizeValue: resizeValue,
+                                  resizeWidth: resizeWidth, resizeHeight: resizeHeight,
                                   allowsUpscaling: allowsUpscaling,
                                   outputFormat: outputFormat,
                                   qualityFloor: Int(qualityFloor.rounded()),

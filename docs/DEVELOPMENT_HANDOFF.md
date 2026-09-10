@@ -1,6 +1,23 @@
 # Kechil PRO development handoff
 
-Updated: 2026-08-31
+Updated: 2026-09-10
+
+## v1.0.2 public release status
+
+Kechil PRO v1.0.2 (build 3) adds locked-proportion Width × Height image resizing,
+a persistent custom converted-image filename appendage (default `-kechil`), and an
+optional actual saved-resolution suffix for image and video Optimize and Watermark.
+The resolution checkbox derives `WIDTHxHEIGHT` from each finished output; it has no
+manual dimension field.
+
+The source gate passes 121 real-media interaction assertions and all dedicated
+filename-naming checks. The native renderer produces 40 snapshots; the changed
+Settings and aspect-lock states were visually inspected without clipping or fixed
+resolution wording while the option is unchecked. The release app is version 1.0.2
+(3), universal `x86_64 arm64`, strictly/deeply ad-hoc signed and sandboxed. The
+read-only mounted DMG and extracted ZIP app passed version, architecture, signature,
+entitlement and integrity checks. See [RELEASE_NOTES_v1.0.2.md](RELEASE_NOTES_v1.0.2.md)
+for the published hashes and download links.
 
 ## v1.0.1 public release status
 

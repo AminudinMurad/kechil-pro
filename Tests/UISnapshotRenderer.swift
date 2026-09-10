@@ -53,6 +53,14 @@ struct UISnapshotRenderer {
                    size: CGSize(width: 940, height: 900),
                    to: outputDirectory.appendingPathComponent("optimize-image-crop-original.png"))
 
+        let dimensionsModel = makeCustomCropModel(policy: .keepNative,
+                                                   resizeMode: .dimensions)
+        dimensionsModel.seedResizeDimensions(width: 1280, height: 814)
+        try render(TransformToolView(model: dimensionsModel),
+                   size: CGSize(width: 940, height: 900),
+                   to: outputDirectory.appendingPathComponent(
+                    "optimize-image-resize-aspect-lock.png"))
+
         try renderBatchActionSnapshots(to: outputDirectory)
 
         try render(VideoOptimizeView(model: makeVideoTrimModel()),
@@ -439,7 +447,11 @@ struct UISnapshotRenderer {
         model.cropFocusX = 0.64
         model.cropFocusY = 0.42
         model.resizeMode = resizeMode
-        model.resizeValue = resizeMode == .percent ? 100 : 1100
+        if resizeMode == .dimensions {
+            model.seedResizeDimensions(width: 1100, height: 700)
+        } else {
+            model.resizeValue = resizeMode == .percent ? 100 : 1100
+        }
         model.allowsUpscaling = false
         return model
     }

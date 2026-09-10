@@ -14,28 +14,33 @@ struct SettingsPanel: View {
     private let licenseURL = URL(string: "https://www.gnu.org/licenses/gpl-3.0.en.html")!
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "gearshape.fill")
-                    .foregroundStyle(Color.accentColor)
-                Text("Settings")
-                    .font(.system(size: 15, weight: .semibold))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "gearshape.fill")
+                        .foregroundStyle(Color.accentColor)
+                    Text("Settings")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+
+                DashboardSizeControl(sizer: sizer)
+                    .background(cardBackground)
+
+                saveDirectorySection
+                    .background(cardBackground)
+
+                convertedFilenameSection
+                    .background(cardBackground)
+
+                aboutSection
+                supportSection
             }
-
-            DashboardSizeControl(sizer: sizer)
-                .background(cardBackground)
-
-            saveDirectorySection
-                .background(cardBackground)
-
-            aboutSection
-            supportSection
+            .padding(14)
         }
-        .padding(14)
-        .frame(width: 500)
-        // The complete Settings stack fits below the smallest dashboard preset.
-        // Keep it fully expanded so macOS does not add an inner scroll bar.
-        .fixedSize(horizontal: false, vertical: true)
+        .kechilScrollbars()
+        // Keep the popover usable on the smallest supported MacBook now that output
+        // naming is configurable. Every setting remains reachable by scrolling.
+        .frame(width: 500, height: 700)
         .alert(item: $updateChecker.notice) { notice in
             if let releaseURL = notice.releaseURL {
                 return Alert(
@@ -166,6 +171,53 @@ struct SettingsPanel: View {
         }
         .padding(16)
         .background(cardBackground)
+    }
+
+    private var convertedFilenameSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            sectionHeading("Converted filenames")
+
+            HStack(spacing: 8) {
+                Text("Append")
+                    .font(.system(size: 11.5, weight: .medium))
+
+                TextField("-kechil", text: $settings.convertedFilenameAppendage)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel("Converted image filename appendage")
+
+                Button("Reset") {
+                    settings.resetConvertedFilenameAppendage()
+                }
+                .disabled(settings.convertedFilenameAppendage ==
+                          ConvertedFilenameNaming.defaultAppendage)
+            }
+
+            Text("Examples: photo\(settings.effectiveConvertedFilenameAppendage)\(resolutionExample).webp · clip-optimized\(resolutionExample).mp4")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            Toggle("Append saved resolution to filename",
+                   isOn: $settings.appendsResolutionToConvertedFilenames)
+                .font(.system(size: 11.5))
+                .toggleStyle(.checkbox)
+                .help("Append each saved image or video's actual final width and height to its filename.")
+
+            Text("Kechil automatically reads each finished file's actual final width × height. There are no dimensions to enter.")
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Custom text applies to converted images. Saved resolution applies to image and video outputs from Optimize and Watermark. Leave the text blank to keep an image's original base name; Kechil still protects existing files and originals.")
+                .font(.system(size: 10.5))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+    }
+
+    private var resolutionExample: String {
+        settings.appendsResolutionToConvertedFilenames ? "-1920x1080" : ""
     }
 
     private var supportSection: some View {

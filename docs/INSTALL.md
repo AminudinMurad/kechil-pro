@@ -1,6 +1,6 @@
 # Installing Kechil PRO
 
-The current public release is [Kechil PRO v1.0.1 (build 2)](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1).
+The current public release is [Kechil PRO v1.0.2 (build 3)](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.2).
 The repository is [github.com/AminudinMurad/kechil-pro](https://github.com/AminudinMurad/kechil-pro).
 
 ## Requirements
@@ -12,19 +12,19 @@ macOS 13 (Ventura) or later, on Apple Silicon or Intel.
 Verify the sidecar before opening the release, then drag the app to Applications:
 
 ```bash
-shasum -a 256 -c Kechil-PRO-v1.0.1-macos-universal.dmg.sha256
-open Kechil-PRO-v1.0.1-macos-universal.dmg
+shasum -a 256 -c Kechil-PRO-v1.0.2-macos-universal.dmg.sha256
+open Kechil-PRO-v1.0.2-macos-universal.dmg
 ```
 
-Download the [universal DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.dmg),
-the [universal ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.zip),
-and their matching [DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.dmg.sha256)
-and [ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.zip.sha256)
-checksum sidecars from the [release page](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1).
+Download the [universal DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.2/Kechil-PRO-v1.0.2-macos-universal.dmg),
+the [universal ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.2/Kechil-PRO-v1.0.2-macos-universal.zip),
+and their matching [DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.2/Kechil-PRO-v1.0.2-macos-universal.dmg.sha256)
+and [ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.2/Kechil-PRO-v1.0.2-macos-universal.zip.sha256)
+checksum sidecars from the [release page](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.2).
 The DMG is the recommended Finder installation path; the ZIP is useful when a
 direct app bundle is preferred.
 
-The v1.0.1 package is ad-hoc signed, not signed with an Apple Developer ID and not
+The v1.0.2 package is ad-hoc signed, not signed with an Apple Developer ID and not
 notarised. Only bypass Gatekeeper for a copy you trust. The release notes document
 the signing boundary and the package verification evidence.
 
@@ -53,7 +53,7 @@ Screen Recording permission:
 tools/render-ui-snapshots.sh
 ```
 
-This writes 39 PNGs to `build/ui-snapshots/`, including the 940 × 650 minimum-height
+This writes 40 PNGs to `build/ui-snapshots/`, including the 940 × 650 minimum-height
 layout, mixed-batch crop enlargement on/off, Original without a crop overlay,
 compact playback controls, green Save All and Selected actions across all six routes,
 light/dark action states, logo defaults, live Clean/Watermark size-estimate cards, and
@@ -89,6 +89,8 @@ codesign -d --entitlements - "build/Kechil PRO.app"
   until Optimize Selected or Optimize All is pressed. Video target MB mode explains
   whether it protects quality by lowering resolution or keeps resolution at the cost of
   visual quality. Video size is an estimate, never an exact-byte claim.
+  Width × Height image resizing locks the cropped aspect ratio by default: changing
+  either dimension recalculates the other. Unlock it for independent dimensions.
 - **Watermark:** preview text or a logo before export, then position, colour, rotate,
   scale or tile it. Video marks are static across the full duration. Image Watermark
   fully encodes the selected image for its live estimate; Video Watermark encodes a real
@@ -148,6 +150,10 @@ Finder's Open With command sends supported images or videos to the corresponding
 mode of the active tool.
 The header settings gear can remember a default output folder using a security-scoped
 bookmark. Clear it in Settings to return Save All to asking for a destination each time.
+Settings can also replace the default `-kechil` appendage for converted images. The
+**Append saved resolution to filename** checkbox adds each finished Optimize or
+Watermark image/video resolution (for example, `-1920x1080`) automatically; it does
+not ask the user to enter dimensions.
 
 The About card links to the GPL-3.0 terms and provides GitHub, GitHub Sponsors,
 Ko-fi and PayPal links for supporting open-source development. The GitHub button

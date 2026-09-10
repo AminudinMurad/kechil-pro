@@ -9,12 +9,40 @@ final class AppSettings: ObservableObject {
 
     @Published private(set) var defaultSaveDirectory: URL?
     @Published private(set) var defaultSaveDirectoryError: String?
+    @Published var convertedFilenameAppendage: String {
+        didSet {
+            UserDefaults.standard.set(convertedFilenameAppendage,
+                                      forKey: Self.convertedFilenameAppendageKey)
+        }
+    }
+    @Published var appendsResolutionToConvertedFilenames: Bool {
+        didSet {
+            UserDefaults.standard.set(appendsResolutionToConvertedFilenames,
+                                      forKey: Self.appendsResolutionKey)
+        }
+    }
 
     private static let bookmarkKey = "kechil.defaultSaveDirectoryBookmark.v1"
+    private static let convertedFilenameAppendageKey =
+        "kechil.convertedFilenameAppendage.v1"
+    private static let appendsResolutionKey = "kechil.appendsOutputResolution.v1"
     private var isAccessingDefaultDirectory = false
 
     private init() {
+        convertedFilenameAppendage = UserDefaults.standard.string(
+            forKey: Self.convertedFilenameAppendageKey)
+            ?? ConvertedFilenameNaming.defaultAppendage
+        appendsResolutionToConvertedFilenames = UserDefaults.standard.bool(
+            forKey: Self.appendsResolutionKey)
         restoreDefaultSaveDirectory()
+    }
+
+    var effectiveConvertedFilenameAppendage: String {
+        ConvertedFilenameNaming.sanitisedAppendage(convertedFilenameAppendage)
+    }
+
+    func resetConvertedFilenameAppendage() {
+        convertedFilenameAppendage = ConvertedFilenameNaming.defaultAppendage
     }
 
     func chooseDefaultSaveDirectory() {

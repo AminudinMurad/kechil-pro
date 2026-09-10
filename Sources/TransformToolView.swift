@@ -148,18 +148,36 @@ struct TransformToolView: View {
                     .frame(maxWidth: .infinity)
 
                     if model.resizeMode != .none {
-                        HStack {
-                            Text(resizeValueLabel).font(.system(size: 11.5))
-                            Spacer()
-                            HStack(spacing: 4) {
-                                KechilNumericStepperField(label: "\(resizeValueLabel) (\(resizeValueUnit))",
-                                                    value: resizeValueBinding,
-                                                    step: 1,
-                                                    lowerBound: 1,
-                                                    upperBound: resizeInputMaximum)
-                                    .frame(width: 82)
-                                Text(resizeValueUnit)
-                                    .font(.system(size: 9.5)).foregroundStyle(.tertiary)
+                        if model.resizeMode == .dimensions {
+                            HStack(spacing: 8) {
+                                resizeDimensionField(.width)
+                                Text("×").font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    .alignmentGuide(VerticalAlignment.center) { dimensions in
+                                        dimensions[VerticalAlignment.center] - 12
+                                    }
+                                resizeDimensionField(.height)
+                            }
+                            Toggle("Lock aspect ratio", isOn: resizeAspectBinding)
+                                .font(.system(size: 11.5))
+                                .help("When locked, changing either dimension updates the other using the current cropped image ratio.")
+                            Text(resizeAspectHelp)
+                                .font(.system(size: 10))
+                                .foregroundStyle(model.locksResizeAspect ? .secondary : .tertiary)
+                        } else {
+                            HStack {
+                                Text(resizeValueLabel).font(.system(size: 11.5))
+                                Spacer()
+                                HStack(spacing: 4) {
+                                    KechilNumericStepperField(label: "\(resizeValueLabel) (\(resizeValueUnit))",
+                                                        value: resizeValueBinding,
+                                                        step: 1,
+                                                        lowerBound: 1,
+                                                        upperBound: resizeInputMaximum)
+                                        .frame(width: 82)
+                                    Text(resizeValueUnit)
+                                        .font(.system(size: 9.5)).foregroundStyle(.tertiary)
+                                }
                             }
                         }
                         Toggle("Allow upscaling after crop", isOn: $model.allowsUpscaling)
@@ -349,6 +367,7 @@ struct TransformToolView: View {
             String(model.cropWidth), String(model.cropHeight),
             model.cropUpscalePolicy.rawValue,
             model.resizeMode.rawValue, String(model.resizeValue),
+            String(model.resizeWidth), String(model.resizeHeight),
             String(model.allowsUpscaling), model.outputFormat.rawValue,
             String(model.qualityFloor), String(model.qualityCeiling),
             String(model.targetKilobytes), String(model.webPLossless),
@@ -371,6 +390,15 @@ struct TransformToolView: View {
         })
     }
 
+    private var resizeAspectBinding: Binding<Bool> {
+        Binding(get: { model.locksResizeAspect }, set: { locked in
+            let ratio = retainedCropSize.flatMap { size in
+                size.height > 0 ? Double(size.width / size.height) : nil
+            }
+            model.setResizeAspectLock(locked, sourceRatio: ratio)
+        })
+    }
+
     private enum CropDimension {
         case width
         case height
@@ -381,6 +409,13 @@ struct TransformToolView: View {
             case .height: return "Height"
             }
         }
+    }
+
+    private enum ResizeDimension {
+        case width
+        case height
+
+        var title: String { self == .width ? "Width" : "Height" }
     }
 
     private func optimizedImage(for item: TransformItem) -> NSImage? {
@@ -503,6 +538,9 @@ struct TransformToolView: View {
         resizeDefaultSeeded = true
         switch mode {
         case .none: break
+        case .dimensions:
+            model.seedResizeDimensions(width: Double(size.width),
+                                       height: Double(size.height))
         case .longEdge: model.resizeValue = Double(max(size.width, size.height).rounded())
         case .width: model.resizeValue = Double(size.width.rounded())
         case .height: model.resizeValue = Double(size.height.rounded())
@@ -522,6 +560,33 @@ struct TransformToolView: View {
                 Text("px").font(.system(size: 9.5)).foregroundStyle(.tertiary)
             }
         }
+    }
+
+    private func resizeDimensionField(_ dimension: ResizeDimension) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(dimension.title).font(.system(size: 9.5)).foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                KechilNumericStepperField(label: "Resize \(dimension.title.lowercased())",
+                    value: resizeDimensionBinding(for: dimension), step: 1, lowerBound: 1)
+                    .frame(minWidth: 78)
+                Text("px").font(.system(size: 9.5)).foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func resizeDimensionBinding(for dimension: ResizeDimension) -> Binding<Double> {
+        Binding(get: {
+            dimension == .width ? model.resizeWidth : model.resizeHeight
+        }, set: { value in
+            resizeUsesSourceDefault = false
+            model.setResizeDimension(isWidth: dimension == .width, value: value)
+        })
+    }
+
+    private var resizeAspectHelp: String {
+        model.locksResizeAspect
+            ? "Width and height stay proportional to the cropped image."
+            : "Width and height are independent; a different ratio will reshape the image."
     }
 
     private func cropDimensionBinding(for dimension: CropDimension) -> Binding<Double> {
@@ -552,6 +617,7 @@ struct TransformToolView: View {
 
     private var resizeValueLabel: String {
         switch model.resizeMode {
+        case .dimensions: return "Dimensions"
         case .longEdge: return "Long edge"
         case .width: return "Width"
         case .height: return "Height"

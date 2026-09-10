@@ -40,6 +40,14 @@ xcrun swiftc \
   "$ROOT"/Sources/*.swift
 echo "    Swift OK"
 
+echo "==> Checking converted image filename naming"
+xcrun swiftc -sdk "$SDK" -module-cache-path "$OUT/module-cache" \
+  -parse-as-library -O -warnings-as-errors -target "$HOST_ARCH-apple-macosx13.0" \
+  -o "$OUT/converted-filename-naming-checks" \
+  "$ROOT/Sources/ConvertedFilenameNaming.swift" \
+  "$ROOT/Tests/ConvertedFilenameNamingChecks.swift"
+"$OUT/converted-filename-naming-checks"
+
 echo "==> Checking build and release scripts"
 bash -n "$ROOT/tools/build-app.sh" "$ROOT/tools/make-dmg.sh" "$ROOT/tools/make-zip.sh"
 echo "    shell syntax OK"

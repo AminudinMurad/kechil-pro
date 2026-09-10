@@ -27,13 +27,22 @@ workflow, support continued development and media-format testing:**
 
 ## Current release
 
-The latest public GitHub release is **Kechil PRO v1.0.1 (build 2)**, following the
-initial v1.0.0 release with measured output-size updates, predictable multi-file
-queues, a more compact workspace for smaller MacBook screens, and GitHub release
-checks in Settings. Read the [complete v1.0.1 release notes](docs/RELEASE_NOTES_v1.0.1.md)
-or [view the public v1.0.1 release](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1).
+The latest public GitHub release is **Kechil PRO v1.0.2 (build 3)**. It adds
+locked-proportion Width × Height image resizing, custom converted-image filename
+text, and an option to append each saved image or video's actual final resolution.
+Read the [complete v1.0.2 release notes](docs/RELEASE_NOTES_v1.0.2.md) or
+[view the public v1.0.2 release](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.2).
 
-## ✨ v1.0.1 (build 2) highlights
+## ✨ v1.0.2 (build 3) highlights
+
+- **Width × Height image resizing** — enter either dimension with the aspect-ratio
+  lock enabled and Kechil calculates the other from the cropped image. Unlock it
+  when independent dimensions are required.
+- **Custom converted-image names** — Settings can replace the default `-kechil`
+  filename appendage and shows the resulting filename before export.
+- **Actual saved resolution in filenames** — one clearly labelled checkbox can add
+  the finished file's detected `-WIDTHxHEIGHT` value to Optimize and Watermark image
+  and video outputs; there are no dimensions to enter manually.
 
 - **Three focused tools** — Clean, Optimize and Watermark, each with separate
   Images and Videos modes and independent queues.
@@ -137,7 +146,8 @@ For the source preview layout, see the [interactive media workspace preview](doc
 
 ### ⚙️ Optimize images and videos
 
-- Image crop, resize, format conversion and WebP quality/method controls.
+- Image crop, percentage or Width × Height resize, format conversion and WebP
+  quality/method controls. Width × Height keeps the cropped aspect ratio by default.
 - Independent crop width and height, crop focus, linked target ratio and a separate
   policy for enlarging smaller images to fill a target.
 - Image formats include WebP, JPEG, PNG, HEIC, AVIF, TIFF and GIF where the macOS
@@ -153,6 +163,9 @@ For the source preview layout, see the [interactive media workspace preview](doc
   Keep Resolution makes the quality/size trade-off explicit.
 - Queue rows report each source's own original dimensions immediately when selected,
   before the current preview or output exists.
+- Settings can customise the default `-kechil` appendage for converted images and
+  optionally add each finished image or video's actual output resolution to Optimize
+  and Watermark filenames.
 
 ### ✨ Watermark images and videos
 
@@ -172,23 +185,23 @@ For the source preview layout, see the [interactive media workspace preview](doc
 
 ## Install (pre-built release)
 
-The latest public release is **Kechil PRO v1.0.1 (build 2)**, provided as one
+The latest public release is **Kechil PRO v1.0.2 (build 3)**, provided as one
 universal macOS app for Apple Silicon and Intel Macs. The DMG is the recommended
 download; the ZIP contains the same app as an alternative.
 
-[**Download Kechil PRO v1.0.1**](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.1)
+[**Download Kechil PRO v1.0.2**](https://github.com/AminudinMurad/kechil-pro/releases/tag/v1.0.2)
 
-- [Download the universal DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.dmg)
-- [Download the universal ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.zip)
-- [Download the DMG checksum](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.dmg.sha256)
-- [Download the ZIP checksum](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.1/Kechil-PRO-v1.0.1-macos-universal.zip.sha256)
-- [Read the complete v1.0.1 release notes](docs/RELEASE_NOTES_v1.0.1.md)
+- [Download the universal DMG](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.2/Kechil-PRO-v1.0.2-macos-universal.dmg)
+- [Download the universal ZIP](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.2/Kechil-PRO-v1.0.2-macos-universal.zip)
+- [Download the DMG checksum](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.2/Kechil-PRO-v1.0.2-macos-universal.dmg.sha256)
+- [Download the ZIP checksum](https://github.com/AminudinMurad/kechil-pro/releases/download/v1.0.2/Kechil-PRO-v1.0.2-macos-universal.zip.sha256)
+- [Read the complete v1.0.2 release notes](docs/RELEASE_NOTES_v1.0.2.md)
 
 Verify the matching archive before opening it:
 
 ~~~bash
-shasum -a 256 -c Kechil-PRO-v1.0.1-macos-universal.dmg.sha256
-shasum -a 256 -c Kechil-PRO-v1.0.1-macos-universal.zip.sha256
+shasum -a 256 -c Kechil-PRO-v1.0.2-macos-universal.dmg.sha256
+shasum -a 256 -c Kechil-PRO-v1.0.2-macos-universal.zip.sha256
 ~~~
 
 > **First launch on macOS**
@@ -199,7 +212,7 @@ shasum -a 256 -c Kechil-PRO-v1.0.1-macos-universal.zip.sha256
 > time you launch it, Control-click the app in Finder and choose **Open**. If
 > macOS still blocks it, open **System Settings → Privacy & Security → Open
 > Anyway**, then confirm **Open**. Only do this for a copy downloaded from the
-> official release links above. The [release notes](docs/RELEASE_NOTES_v1.0.1.md)
+> official release links above. The [release notes](docs/RELEASE_NOTES_v1.0.2.md)
 > document the signing boundary and verified package contents.
 
 ## Batch workflow
@@ -301,7 +314,7 @@ The resulting app is at build/Kechil PRO.app; release packages are in releases/.
 
 ## Tested with
 
-The v1.0.1 (build 2) source and its public package passed the full verification gate.
+The v1.0.2 (build 3) source and its public package passed the full verification gate.
 Coverage includes:
 
 | Area | Coverage |
@@ -309,13 +322,16 @@ Coverage includes:
 | Shared actions | 29 assertions for exact widths, green states, Selected/All availability and busy behaviour |
 | Update checking | 6 assertions for semantic release-version comparison and tag normalisation |
 | Queue selection | 9 assertions for click, Command-click, Shift-click, captured IDs and mixed queues |
-| Real media interactions | 117 assertions across image/video Clean, Optimize, Watermark, playback, saving and source preservation |
+| Real media interactions | 121 assertions across image/video Clean, Optimize, Watermark, playback, naming, saving and source preservation |
 | Packaging | Universal arm64 + x86_64, hdiutil verify, ZIP integrity, checksum sidecars and strict/deep app signature verification |
-| UI | 39 native SwiftUI snapshots rendered and inspected, including compact, dark, busy, estimate, logo-default and original-dimension states |
+| UI | 40 native SwiftUI snapshots rendered, including the locked-aspect resize state and Settings filename controls; the changed states were visually inspected |
 
-The full release evidence is in [the batch-actions QA report](docs/qa/BATCH_ACTIONS_QA_2026-08-31.md) and [the development handoff](docs/DEVELOPMENT_HANDOFF.md).
+The full current release evidence is in [the v1.0.2 release notes](docs/RELEASE_NOTES_v1.0.2.md)
+and [the development handoff](docs/DEVELOPMENT_HANDOFF.md). The earlier
+[batch-actions QA report](docs/qa/BATCH_ACTIONS_QA_2026-08-31.md) remains the
+historical evidence for v1.0.1.
 
-The [v1.0.1 release notes](docs/RELEASE_NOTES_v1.0.1.md) record the published package
+The [v1.0.2 release notes](docs/RELEASE_NOTES_v1.0.2.md) record the published package
 hashes, signing boundary and final verification results.
 
 ## Project layout

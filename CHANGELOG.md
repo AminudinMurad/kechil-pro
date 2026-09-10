@@ -3,6 +3,23 @@
 All notable changes to Kechil PRO are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.0.2] — 2026-09-10
+
+### Added
+- Image Optimize now has a **Width × Height** resize mode with a default-on aspect
+  ratio lock. Editing either dimension updates the other from the cropped image ratio;
+  unlocking permits independent output dimensions.
+- Settings now offers a persistent custom appendage for converted image filenames,
+  retaining `-kechil` as the default, plus a reset action and live filename examples.
+- Settings can optionally append the verified output resolution, such as
+  `-1920x1080`, to image and video outputs from Optimize and Watermark.
+
+### Changed
+- Converted filename text is bounded and sanitised so path separators cannot become
+  part of an output path. Existing originals and destination files remain protected.
+- The expanded Settings panel now scrolls within a compact height so every preference
+  remains reachable on the smallest supported MacBook display.
+
 ## [1.0.0] — 2026-08-31
 
 ### Changed

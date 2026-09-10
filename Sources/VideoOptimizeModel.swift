@@ -242,7 +242,8 @@ final class VideoOptimizeModel: ObservableObject {
         for item in pending {
             guard let outputURL = item.outputURL else { continue }
             let filename = item.suggestedFilename(suffix: "optimized",
-                                                  extension: outputURL.pathExtension)
+                extension: outputURL.pathExtension,
+                includeResolution: AppSettings.shared.appendsResolutionToConvertedFilenames)
             let destination = MediaSaveService.uniqueURL(in: folder, filename: filename)
             if write(itemID: item.id, outputURL: outputURL, destination: destination) { saved += 1 }
         }
@@ -358,7 +359,8 @@ final class VideoOptimizeModel: ObservableObject {
         guard let outputURL = item.outputURL else { return }
         let panel = NSSavePanel()
         panel.nameFieldStringValue = item.suggestedFilename(suffix: "optimized",
-                                                            extension: outputURL.pathExtension)
+            extension: outputURL.pathExtension,
+            includeResolution: AppSettings.shared.appendsResolutionToConvertedFilenames)
         panel.directoryURL = AppSettings.shared.defaultSaveDirectory
         panel.canCreateDirectories = true
         panel.message = "Save the optimized copy of \(item.displayName)"
@@ -374,7 +376,9 @@ final class VideoOptimizeModel: ObservableObject {
         var saved = 0
         for item in pending {
             guard let outputURL = item.outputURL else { continue }
-            let name = item.suggestedFilename(suffix: "optimized", extension: outputURL.pathExtension)
+            let name = item.suggestedFilename(suffix: "optimized",
+                extension: outputURL.pathExtension,
+                includeResolution: AppSettings.shared.appendsResolutionToConvertedFilenames)
             let destination = MediaSaveService.uniqueURL(in: folder, filename: name)
             if write(itemID: item.id, outputURL: outputURL, destination: destination) { saved += 1 }
         }

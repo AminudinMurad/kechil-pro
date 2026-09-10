@@ -28,6 +28,7 @@ enum CropAspect: String, CaseIterable, Identifiable {
 
 enum ResizeMode: String, CaseIterable, Identifiable {
     case none = "Original size"
+    case dimensions = "Width × Height"
     case longEdge = "Long edge"
     case width = "Width"
     case height = "Height"
@@ -106,6 +107,8 @@ struct TransformSettingsSnapshot {
     var cropUpscalePolicy: ImageCropUpscalePolicy = .keepNative
     var resizeMode: ResizeMode = .none
     var resizeValue: Double = 1600
+    var resizeWidth = 0.0
+    var resizeHeight = 0.0
     /// When disabled, a resize cannot exceed the pixels retained by the crop.
     var allowsUpscaling = ImageResizePolicy.allowsUpscalingByDefault
     var outputFormat: ImageOutputFormat = .webp
@@ -161,6 +164,7 @@ enum TransformPipeline {
                      focusX: settings.cropFocusX, focusY: settings.cropFocusY,
                      cropUpscalePolicy: settings.cropUpscalePolicy)
         image = resize(image, mode: settings.resizeMode, value: settings.resizeValue,
+                       width: settings.resizeWidth, height: settings.resizeHeight,
                        allowsUpscaling: settings.allowsUpscaling)
 
         let extent = image.extent.integral
@@ -236,12 +240,30 @@ enum TransformPipeline {
     }
 
     private static func resize(_ image: CIImage, mode: ResizeMode, value: Double,
+                               width: Double, height: Double,
                                allowsUpscaling: Bool) -> CIImage {
-        guard mode != .none, value > 0 else { return image }
+        guard mode != .none else { return image }
         let size = image.extent.size
+        if mode == .dimensions {
+            guard width.isFinite, height.isFinite, width > 0, height > 0 else {
+                return image
+            }
+            let requestedX = CGFloat(width.rounded()) / size.width
+            let requestedY = CGFloat(height.rounded()) / size.height
+            let scaleX = ImageResizePolicy.finalScale(requested: requestedX,
+                                                       allowsUpscaling: allowsUpscaling)
+            let scaleY = ImageResizePolicy.finalScale(requested: requestedY,
+                                                       allowsUpscaling: allowsUpscaling)
+            guard abs(scaleX - 1) > 0.0001 || abs(scaleY - 1) > 0.0001 else {
+                return image
+            }
+            return image.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+        }
+        guard value > 0 else { return image }
         let scale: CGFloat
         switch mode {
         case .none: return image
+        case .dimensions: return image
         case .longEdge: scale = CGFloat(value) / max(size.width, size.height)
         case .width: scale = CGFloat(value) / size.width
         case .height: scale = CGFloat(value) / size.height

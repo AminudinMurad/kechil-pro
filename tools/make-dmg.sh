@@ -6,7 +6,7 @@
 #   UNIVERSAL=0 tools/make-dmg.sh     this Mac's architecture only (faster)
 #   SIGNED=0 tools/make-dmg.sh        skip sandbox entitlements (not for release QA)
 #   SKIP_BUILD=1 tools/make-dmg.sh    package build/Kechil PRO.app as it stands
-#   VERSION=1.0.1 tools/make-dmg.sh   override the version in the filename
+#   VERSION=1.0.2 tools/make-dmg.sh   override the version in the filename
 #   SIGN_IDENTITY="Developer ID Application: ..."   also sign the .dmg itself
 #
 set -euo pipefail

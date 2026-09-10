@@ -105,6 +105,12 @@ enum MediaInteractionChecks {
         settings.cropAspect = .original
         let noCrop = try TransformPipeline.process(landscape, settings: settings)
         expect(noCrop.width == 1000 && noCrop.height == 600, "No crop ignores a saved crop enlargement setting")
+        settings.resizeMode = .dimensions
+        settings.resizeWidth = 640
+        settings.resizeHeight = 360
+        let exactResize = try TransformPipeline.process(landscape, settings: settings)
+        expect(exactResize.width == 640 && exactResize.height == 360,
+               "Width × Height resize produces the requested dimensions")
 
         let model = TransformModel()
         model.outputFormat = .png
@@ -129,6 +135,17 @@ enum MediaInteractionChecks {
         expect(model.batchCropImpactSummary.contains("2 of 3"), "batch summary explains the affected image count")
         expect(model.cropPrediction(for: model.items[0])?.contains("enlarge 1.40×") == true,
                "row prediction exposes enlargement without claiming an output exists")
+        model.seedResizeDimensions(width: 1000, height: 600)
+        model.setResizeDimension(isWidth: true, value: 500)
+        expect(model.resizeWidth == 500 && model.resizeHeight == 300,
+               "locked resize width updates height proportionally")
+        model.setResizeAspectLock(false, sourceRatio: nil)
+        model.setResizeDimension(isWidth: true, value: 400)
+        expect(model.resizeWidth == 400 && model.resizeHeight == 300,
+               "unlocked resize dimensions remain independent")
+        model.setResizeAspectLock(true, sourceRatio: 16.0 / 9.0)
+        expect(model.resizeWidth == 400 && model.resizeHeight == 225,
+               "relocking resize uses the current cropped-image ratio")
 
         // Host the real view so selection-triggered onChange behavior is exercised.
         let window = NSWindow(contentRect: CGRect(x: -10000, y: -10000, width: 940, height: 900),

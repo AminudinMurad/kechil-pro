@@ -69,8 +69,13 @@ struct VideoQueueItem: Identifiable {
         }
     }
 
-    func suggestedFilename(suffix: String, extension ext: String) -> String {
-        "\(sourceURL.deletingPathExtension().lastPathComponent)-\(suffix).\(ext)"
+    func suggestedFilename(suffix: String, extension ext: String,
+                           includeResolution: Bool = false) -> String {
+        ConvertedFilenameNaming.filename(
+            sourceURL: sourceURL, outputExtension: ext, appendage: "-\(suffix)",
+            includeResolution: includeResolution,
+            width: outputDescriptor?.displayWidth,
+            height: outputDescriptor?.displayHeight)
     }
 }
 
